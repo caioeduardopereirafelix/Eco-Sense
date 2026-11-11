@@ -5,8 +5,9 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 /* ---------- formatação (a API manda números puros e datas ISO; aqui viram texto pt-BR) ---------- */
 /* num(3.4) → "3,4"; num(3.4,2) → "3,40" (casas fixas) */
 const num=(n,digits)=>Number(n).toLocaleString('pt-BR',digits==null?undefined:{minimumFractionDigits:digits,maximumFractionDigits:digits});
-const pct=n=>`${Number(n).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
-const kwh=(n,digits)=>`${num(n,digits)} kWh`;
+/* valores ausentes (null) aparecem como "—" */
+const pct=n=>n==null?'—':`${Number(n).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+const kwh=(n,digits)=>n==null?'—':`${num(n,digits)} kWh`;
 /* rótulo do eixo X a partir de um timestamp: passo 'hour' → "14h"; 'day' → "05/11" */
 const timeLabel=(iso,step)=>{const d=new Date(iso);
  return step==='hour'?`${d.getHours()}h`:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`};

@@ -38,8 +38,12 @@ const topConsumers=loads=>{
 
 /* variação vs. ontem: ▲/▼ com a cor certa. higherIsGood: true para geração, false para consumo */
 const changeText=(changePct,higherIsGood,suffix=' vs. ontem')=>{
+ if(changePct==null)return'<span class="mu">sem comparação com ontem</span>';
  const up=changePct>=0,good=up===higherIsGood;
  return `<span class="${good?'up':'dn'}">${up?'▲':'▼'} ${pct(Math.abs(changePct))}${suffix}</span>`};
+
+/* armazenamento: "6,8 kWh de 10 kWh"; sem baterias do sistema cadastradas, o % é a média dos dispositivos */
+const storageText=s=>s.capacityKwh!=null?`${kwh(s.storedKwh)} de ${kwh(s.capacityKwh)}`:'Média das baterias dos dispositivos';
 
 /* ---------- histórico: rótulos e unidade a partir da resposta da API ---------- */
 const historyLabels=h=>h.timestamps.map(t=>timeLabel(t,h.step));
@@ -49,11 +53,22 @@ const historyUnit=h=>h.step==='hour'?'kWh/h':'kWh/dia';
    custom: inclui o filtro "Personalizado" (admin); storageTitle: título do gráfico de bateria */
 async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}){
  const options=[['hoje','Hoje'],['7d','7 dias'],['30d','30 dias'],...(custom?[['custom','Personalizado']]:[])];
+ /* período personalizado: começa nos últimos 14 dias; o back-end guarda até 31 dias */
+ const isoDay=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoDay(d)};
+ const period={from:daysAgo(13),to:daysAgo(0)},minDay=daysAgo(30),maxDay=daysAgo(0);
  const draw=async k=>{
-  const h=await api.getHistory(k);
+  let h=null,error='';
+  try{h=await api.getHistory(k,k==='custom'?period:{})}
+  catch(e){if(k!=='custom')throw e;error=e.message}
   charts.forEach(c=>c.destroy());charts=[];
   V.innerHTML='';V.append(filters(options,k,draw));
-  if(k==='custom')V.insertAdjacentHTML('beforeend','<div class="row"><input type="date" value="2026-09-23" aria-label="Data inicial"> até <input type="date" value="2026-10-06" aria-label="Data final"></div>');
+  if(k==='custom'){
+   V.insertAdjacentHTML('beforeend',`<div class="row"><input type="date" id="hfrom" value="${period.from}" min="${minDay}" max="${maxDay}" aria-label="Data inicial"> até <input type="date" id="hto" value="${period.to}" min="${minDay}" max="${maxDay}" aria-label="Data final"><span role="alert" style="color:var(--cr);font-size:13px">${esc(error)}</span></div>`);
+   $('#hfrom').onchange=e=>{period.from=e.target.value;draw('custom')};
+   $('#hto').onchange=e=>{period.to=e.target.value;draw('custom')};
+  }
+  if(!h)return;
   V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${historyUnit(h)})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${historyUnit(h)})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>${esc(storageTitle)} (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
   const labels=historyLabels(h);
   chart('c1','line',labels,[lineDataset('--gen','Gerada',h.generatedKwh)]);

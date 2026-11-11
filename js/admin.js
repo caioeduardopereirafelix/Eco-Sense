@@ -5,7 +5,7 @@ async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(),api.getAlert
  V.innerHTML=`<div class="grid">
  <div class="card"><h3>Energia gerada</h3><div class="big">${num(o.generation.todayKwh)} <small>kWh</small></div>${changeText(o.generation.changePct,true)}</div>
  <div class="card"><h3>Energia consumida</h3><div class="big">${num(o.consumption.nowW)} <small>W agora</small></div><div class="mu">Período: ${kwh(o.consumption.todayKwh)} · ${changeText(o.consumption.changePct,false,'')}</div></div>
- <div class="card"><h3>Energia armazenada</h3><div class="big">${num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct,'var(--sto)')}<div class="mu">${kwh(o.storage.storedKwh)} de ${kwh(o.storage.capacityKwh)} · ${tag(o.storage.status)}</div></div>
+ <div class="card"><h3>Energia armazenada</h3><div class="big">${o.storage.pct==null?"—":num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct||0,'var(--sto)')}<div class="mu">${storageText(o.storage)} · ${tag(o.storage.status)}</div></div>
  <div class="card"><h3>Dispositivos</h3><div class="big">${num(o.devices.total)}</div><div class="mu"><span class="s-Online">● ${num(o.devices.online)} online</span> · <span class="s-Offline">● ${num(o.devices.offline)} offline</span></div></div></div>
  <div class="grid g2"><div class="card"><h3>Gerada × consumida hoje (kWh/h)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
  <div class="card"><h3>Nível de armazenamento hoje (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>

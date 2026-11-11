@@ -1,6 +1,9 @@
-/* ===== 2. CAMADA DE DADOS: trocar o corpo por fetch() ao integrar =====
+/* ===== 2. CAMADA DE DADOS =====
+   `api` aponta para o back-end real (httpApi, no fim do arquivo) se js/config.js definir
+   ECOSENSE_API_URL; senão, para os dados mockados (mockApi). As duas têm os mesmos métodos.
    Contrato: todo método devolve uma Promise (erros viram Promise rejeitada) e entrega uma
    CÓPIA dos dados — quem chama pode alterar o resultado sem afetar o "banco" (MOCK). */
+const API_URL=(window.ECOSENSE_API_URL||'').replace(/\/+$/,'')||null;
 const wait=v=>new Promise(r=>setTimeout(()=>r(structuredClone(v)),120));
 const MAINTENANCE_STORAGE_KEY='eh-maintenance-requests';
 const MAINTENANCE_STATUSES=['Recebida','Agendada','Em rota','Concluída'];
@@ -24,7 +27,7 @@ function parseDay(value){
  const back=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
  return back===value?date:null;
 }
-const api={
+const mockApi={
  /* Totais de dispositivos calculados da lista, para nunca divergirem dela (no back-end real, já virão consistentes) */
  getOverview(){
   const on=MOCK.devices.filter(d=>d.status==='Online').length;
@@ -77,14 +80,43 @@ const api={
    battery:{measured:level.map((v,i)=>i<=past?v:null),predicted:level.map((v,i)=>i>=past?v:null)}})},
  /* Histórico agregado. range: 'hoje' (24 pontos por hora desde 00:00) ou '7d'/'30d'/'custom' (um ponto por dia,
     terminando hoje). generatedKwh/consumedKwh em kWh por passo; storagePct em %. */
- getHistory(range){
-  const n={hoje:24,'7d':7,'30d':30,custom:14}[range];
-  if(!n)return Promise.reject(new Error('Período de histórico inválido.'));
+ getHistory(range,{from,to}={}){
+  let n={hoje:24,'7d':7,'30d':30}[range];
   const h=range==='hoje',start=new Date();start.setHours(0,0,0,0);
-  if(!h)start.setDate(start.getDate()-(n-1));
+  if(range==='custom'){
+   const a=parseDay(from),b=parseDay(to);
+   if(!a||!b)return Promise.reject(new Error('Informe as datas inicial e final.'));
+   if(a>b)return Promise.reject(new Error('A data inicial deve ser anterior à final.'));
+   n=Math.round((b-a)/86400000)+1;start.setTime(a.getTime());
+  }else if(!n)return Promise.reject(new Error('Período de histórico inválido.'));
+  else if(!h)start.setDate(start.getDate()-(n-1));
   const timestamps=[...Array(n)].map((_,i)=>{const t=new Date(start);if(h)t.setHours(i);else t.setDate(start.getDate()+i);return t.toISOString()});
   const generatedKwh=timestamps.map((_,i)=>+(h?Math.max(0,Math.sin((i-6)/12*Math.PI))*0.45:3.5+Math.sin(i*1.3)*1.2).toFixed(2));
   const consumedKwh=timestamps.map((_,i)=>+(h?0.12+Math.abs(Math.sin(i/3))*0.1:3.6+Math.cos(i*.9)*.6).toFixed(2));
   let s=60;const storagePct=generatedKwh.map((g,i)=>{s=Math.min(98,Math.max(15,s+(g-consumedKwh[i])*(h?20:4)));return Math.round(s)});
   return wait({step:h?'hour':'day',timestamps,generatedKwh,consumedKwh,storagePct})}
 };
+
+/* ===== API real (back-end Java, ver docs/API.md) =====
+   Usada quando window.ECOSENSE_API_URL estiver definida em js/config.js. */
+async function http(path,{method='GET',body}={}){
+ let res;
+ try{
+  res=await fetch(API_URL+path,{method,headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
+ }catch(e){throw new Error('Não foi possível conectar ao servidor. Verifique se o back-end está rodando.')}
+ const data=await res.json().catch(()=>null);
+ if(!res.ok)throw new Error(data&&data.message||`Erro ${res.status} ao acessar a API.`);
+ return data;
+}
+const query=params=>{const q=new URLSearchParams(Object.entries(params).filter(([,v])=>v!=null&&v!==''));return q.toString()?`?${q}`:''};
+const httpApi={
+ getOverview:()=>http('/overview'),getSources:()=>http('/sources'),getLoads:()=>http('/loads'),
+ getBatteries:()=>http('/batteries'),getDevices:()=>http('/devices'),getAlerts:()=>http('/alerts'),
+ getForecasts:()=>http('/forecasts'),
+ getForecastSeries:(id,range)=>http(`/devices/${encodeURIComponent(id)}/forecast${query({range})}`),
+ getHistory:(range,{from,to}={})=>http(`/history${query({range,from,to})}`),
+ getMaintenanceRequests:()=>http('/maintenance-requests'),
+ requestMaintenance:(deviceId,{reason,note})=>http('/maintenance-requests',{method:'POST',body:{deviceId,reason,note}}),
+ updateMaintenanceRequest:(id,{status,scheduledFor})=>http(`/maintenance-requests/${encodeURIComponent(id)}`,{method:'PATCH',body:{status,scheduledFor}})
+};
+const api=API_URL?httpApi:mockApi;

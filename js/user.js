@@ -43,7 +43,7 @@ async inicio(){
  V.innerHTML=`${banner}<div class="grid">
   <div class="card"><h3>Energia gerada hoje</h3><div class="big">${num(o.generation.todayKwh)} <small>kWh</small></div>${changeText(o.generation.changePct,true)}</div>
   <div class="card"><h3>Consumo agora</h3><div class="big">${num(o.consumption.nowW)} <small>W</small></div><div class="mu">Hoje: ${kwh(o.consumption.todayKwh)}</div></div>
-  <div class="card"><h3>Bateria armazenada</h3><div class="big">${num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct,'var(--sto)')}<div class="mu">${kwh(o.storage.storedKwh)} de ${kwh(o.storage.capacityKwh)}</div></div>
+  <div class="card"><h3>Bateria armazenada</h3><div class="big">${o.storage.pct==null?"—":num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct||0,'var(--sto)')}<div class="mu">${storageText(o.storage)}</div></div>
   <div class="card"><h3>Dispositivos online</h3><div class="big">${online} <small>de ${devices.length}</small></div><div class="mu">${devices.length-online} offline</div></div></div>
   <div class="card" style="margin-bottom:16px"><h3>Gerada × consumida hoje (kWh/h)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
   <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;

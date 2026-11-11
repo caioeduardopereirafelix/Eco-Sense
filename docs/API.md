@@ -1,8 +1,8 @@
 # Contrato da API — EcoSense
 
-Formato que o back-end (Java) deve devolver ao front-end. O front já funciona com estes dados
-mockados em [`js/data/mock.js`](../js/data/mock.js); para integrar, basta trocar o corpo de cada
-método de [`js/services/api.js`](../js/services/api.js) por um `fetch()` para o endpoint indicado.
+Formato que o back-end ([`backend/`](../backend/README.md), Java + Spring Boot) devolve ao front-end.
+O front funciona com os mesmos dados mockados em [`js/data/mock.js`](../js/data/mock.js) ou com o back-end:
+basta definir `ECOSENSE_API_URL` em [`js/config.js`](../js/config.js) (ex.: `http://localhost:8080/api`).
 
 ## Arquitetura
 
@@ -33,7 +33,7 @@ Status exibidos como tag usam estes valores (texto em português, também usados
 
 ## Endpoints
 
-Os caminhos são sugestão; o que importa é o formato da resposta.
+Todos implementados em `backend/` (`ApiController`).
 
 ### `GET /api/overview` → `api.getOverview()`
 ```json
@@ -44,12 +44,16 @@ Os caminhos são sugestão; o que importa é o formato da resposta.
   "devices":     { "total": 10, "online": 8, "offline": 2 }
 }
 ```
-`changePct` = variação em relação a ontem (negativo = queda).
+`changePct` = variação em relação a ontem no mesmo horário (negativo = queda; `null` sem dados de ontem).
+`storage`: com baterias do sistema cadastradas, carga ponderada pela capacidade; sem elas, `pct` é a média
+das baterias dos dispositivos e `storedKwh`/`capacityKwh` vêm `null`.
 
 ### `GET /api/sources` → `api.getSources()`
 ```json
 [{ "name": "Solar", "energyKwh": 3.4, "efficiencyPct": 18.2, "status": "Normal", "updatedAt": "2026-11-10T14:04:00Z" }]
 ```
+Uma fonte por tipo de coleta, somando a energia de hoje dos dispositivos daquele tipo. `efficiencyPct` é `null`
+enquanto não houver medição da energia disponível no ambiente.
 
 ### `GET /api/loads` → `api.getLoads()`
 ```json
@@ -118,7 +122,8 @@ que a coleta cobre o consumo; `false` significa sem leitura suficiente. `confide
 }
 ```
 `hoje` = 24 pontos por hora (`step: "hour"`, kWh por hora); os demais = um ponto por dia terminando hoje
-(`step: "day"`, kWh por dia). Para `custom`, aceitar também `from` e `to` (`AAAA-MM-DD`).
+(`step: "day"`, kWh por dia). `custom` exige `from` e `to` (`AAAA-MM-DD`, até 31 dias atrás).
+Horas/dias sem leitura (ou no futuro) vêm `null`.
 Os agregados podem vir da própria API do ThingSpeak (parâmetros `average`/`sum` e `timescale`) ou ser
 calculados no back-end.
 
