@@ -127,7 +127,10 @@ public class EnergyService {
             boolean online = devices.isOnline(d, data);
             double current = online && data.latest().consumptionW() != null ? data.latest().consumptionW() : 0;
             Double avg = Stats.mean(DeviceService.since(data.hourly(), weekAgo), Reading::consumptionW);
-            return new Load(d.name(), d.type(), Stats.sig(current), avg == null ? 0 : Stats.sig(avg),
+            /* canal que não mede consumo: currentW/avgW null em vez de 0 */
+            boolean measured = d.fields().measuresConsumption();
+            return new Load(d.name(), d.type(), measured ? Stats.sig(current) : null,
+                    !measured ? null : avg == null ? 0d : Stats.sig(avg),
                     d.priority(), loadStatus(online, data, current, avg));
         }).toList();
     }

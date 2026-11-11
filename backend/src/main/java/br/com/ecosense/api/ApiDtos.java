@@ -23,15 +23,16 @@ public final class ApiDtos {
     public record DeviceCount(int total, int online, int offline) {}
 
     public record Source(String name, double energyKwh, Double efficiencyPct, String status, Instant updatedAt) {}
-    public record Load(String name, String type, double currentW, double avgW, String priority, String status) {}
+    /** currentW/avgW são null quando o canal não mede consumo. */
+    public record Load(String name, String type, Double currentW, Double avgW, String priority, String status) {}
     public record Battery(String name, String type, double capacityKwh, Integer pct, String status) {}
 
-    /** battery em %, consumption e harvesting.collected em Wh/dia, temperature em °C, txInterval em min. */
+    /** battery em %, consumption e harvesting.collected em Wh/dia (null se o canal não mede), temperature em °C, txInterval em min. */
     public record Device(String id, String name, String location, String region,
                          Double latitude, Double longitude, String status,
-                         int battery, double consumption, Instant lastSeenAt,
+                         int battery, Double consumption, Instant lastSeenAt,
                          Double temperature, int txInterval, Harvesting harvesting) {}
-    public record Harvesting(String type, double collected) {}
+    public record Harvesting(String type, Double collected) {}
 
     /** level: critical | high | warning | info */
     public record Alert(String id, String level, String title, String message, Instant createdAt) {}

@@ -63,10 +63,13 @@ public class DeviceService {
         Double avgHarvestedW = Stats.mean(last24h, Reading::harvestedW);
 
         int battery = latest != null && latest.battery() != null ? (int) Math.round(latest.battery()) : 0;
-        double consumptionWhDay = online && avgConsumptionW != null ? Stats.sig(avgConsumptionW * 24) : 0;
+        /* canal sem a leitura (field = none) → null ("não medido"); medido mas offline → 0 */
+        Double consumptionWhDay = !d.fields().measuresConsumption() ? null
+                : online && avgConsumptionW != null ? Stats.sig(avgConsumptionW * 24) : 0;
         Double temperature = online && latest.temperature() != null ? Stats.round(latest.temperature(), 1) : null;
         Harvesting harvesting = d.harvestingType() == null ? null : new Harvesting(d.harvestingType(),
-                online && avgHarvestedW != null ? Stats.sig(avgHarvestedW * 24) : 0);
+                !d.fields().measuresHarvested() ? null
+                        : online && avgHarvestedW != null ? Stats.sig(avgHarvestedW * 24) : 0d);
 
         return new Device(d.id(), d.name(), d.location(), d.region(), d.latitude(), d.longitude(),
                 online ? "Online" : "Offline", battery, consumptionWhDay,

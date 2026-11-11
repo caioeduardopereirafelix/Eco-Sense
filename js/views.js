@@ -14,8 +14,10 @@ const readIds=new Set();
 const withRead=list=>list.map(a=>({...a,read:readIds.has(String(a.id))}));
 
 /* ---------- dispositivos ---------- */
+/* energia por dia (Wh/dia); null = o canal não mede essa leitura → "—" */
+const perDay=wh=>wh==null?'—':`${energy(wh)}/dia`;
 const harvestText=(d,emptyLabel)=>d.harvesting
- ?`${energy(d.harvesting.collected)}/dia <span class="mu">(${esc(d.harvesting.type)})</span>`
+ ?`${perDay(d.harvesting.collected)} <span class="mu">(${esc(d.harvesting.type)})</span>`
  :`<span class="mu">${emptyLabel}</span>`;
 /* topo comum dos cards de dispositivo: local, nome, status e bateria */
 const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}${esc(d.location)}</h3>
@@ -33,7 +35,8 @@ const batteryCard=x=>{
    <div class="batt">${cells}</div>${tag(x.status)}${charging?' <span class="mu">⚡ recebendo carga</span>':''}</div>`};
 /* barras com as 3 cargas de maior consumo (conteúdo do card, sem o card) */
 const topConsumers=loads=>{
- const top=[...loads].sort((a,b)=>b.currentW-a.currentW).slice(0,3),max=top.length&&top[0].currentW||1;
+ /* só cargas que medem consumo (currentW null = canal sem essa leitura) */
+ const top=loads.filter(x=>x.currentW!=null).sort((a,b)=>b.currentW-a.currentW).slice(0,3),max=top.length&&top[0].currentW||1;
  return top.map(x=>`<div>${esc(x.name)} <span class="mu">${power(x.currentW)}</span>${bar(x.currentW/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
 
 /* variação vs. ontem: ▲/▼ com a cor certa. higherIsGood: true para geração, false para consumo */

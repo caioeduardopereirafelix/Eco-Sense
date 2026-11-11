@@ -73,7 +73,7 @@ async dispositivos(){
    ${deviceCardHead(d)}
    <dl class="kv">
     ${kvRow('Autonomia prevista',daysTag(f))}
-    ${kvRow('Consumo',`${energy(d.consumption)}/dia`)}
+    ${kvRow('Consumo',perDay(d.consumption))}
     ${kvRow('Energia coletada',harvestText(d,'Sem coleta de energia'))}
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
    </dl>${action}</div>`};

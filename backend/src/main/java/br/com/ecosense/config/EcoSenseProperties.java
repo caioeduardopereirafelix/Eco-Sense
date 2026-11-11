@@ -91,6 +91,15 @@ public record EcoSenseProperties(
             temperature = temperature != null ? temperature : "field3";
             harvested = harvested != null ? harvested : "field4";
         }
+
+        /** false quando o canal não tem essa leitura (field = none): a API devolve null, não 0. */
+        public boolean measuresConsumption() {
+            return !"none".equalsIgnoreCase(consumption);
+        }
+
+        public boolean measuresHarvested() {
+            return !"none".equalsIgnoreCase(harvested);
+        }
     }
 
     /**

@@ -60,7 +60,7 @@ enquanto não houver medição da energia disponível no ambiente.
 ```json
 [{ "name": "Gateway LoRa", "type": "Comunicação", "currentW": 48, "avgW": 44, "priority": "Alta", "status": "Normal" }]
 ```
-`priority`: `Alta` | `Média` | `Baixa`.
+`priority`: `Alta` | `Média` | `Baixa`. `currentW` e `avgW` são `null` quando o canal do dispositivo não mede consumo.
 
 ### `GET /api/batteries` → `api.getBatteries()`
 ```json
@@ -77,7 +77,7 @@ enquanto não houver medição da energia disponível no ambiente.
   "harvesting": { "type": "Solar", "collected": 15 }
 }]
 ```
-Unidades: `battery` em %, `consumption` e `harvesting.collected` em Wh/dia, `temperature` em °C
+Unidades: `battery` em %, `consumption` e `harvesting.collected` em Wh/dia (`null` = o canal não mede essa leitura; `0` = mede, mas está offline), `temperature` em °C
 (`null` se offline), `txInterval` em minutos. `harvesting` é `null` quando o dispositivo não coleta energia.
 No ThingSpeak, cada dispositivo costuma ser um canal; `lastSeenAt` = `created_at` do último *feed*.
 

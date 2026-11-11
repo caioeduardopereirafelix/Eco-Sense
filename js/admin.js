@@ -22,7 +22,7 @@ async geracao(){const s=await api.getSources(),h=await api.getHistory('7d');
 async consumo(){const l=await api.getLoads();
  V.innerHTML=`<div class="row"><button class="btn${eco?' on':''}" id="eco">${eco?'Modo Economia ativo':'Ativar Modo Economia'}</button></div>${eco?'<div class="banner">Modo Economia ativo: cargas de baixa prioridade reduzidas (simulação visual).</div>':''}
  <div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
- ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>{const c=eco&&p==='Baixa'?x.currentW*.5:x.currentW;return`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(c)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`}).join('')}</table></div></div>`).join('')}`;
+ ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>{const c=eco&&p==='Baixa'&&x.currentW!=null?x.currentW*.5:x.currentW;return`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(c)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`}).join('')}</table></div></div>`).join('')}`;
  $('#eco').onclick=()=>{eco=!eco;pages.consumo()}},
 async armazenamento(){const b=await api.getBatteries();
  V.innerHTML=`<div class="grid g2">${b.map(batteryCard).join('')}</div>`},
@@ -134,23 +134,24 @@ async dispositivos(){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
  /* saldo = energia coletada - consumo (Wh). Sem harvesting, o saldo é só o consumo negativo. */
- const balance=d=>(d.harvesting?d.harvesting.collected:0)-d.consumption;
+ /* null quando falta consumo ou coleta medidos (não dá para calcular o saldo) */
+ const balance=d=>d.consumption==null||(d.harvesting&&d.harvesting.collected==null)?null:(d.harvesting?d.harvesting.collected:0)-d.consumption;
  const isOn=d=>d.status==='Online';
  const filtersFn={
   all:()=>true,
   on:isOn,
   off:d=>!isOn(d),
   low:d=>isOn(d)&&d.battery<20,
-  neg:d=>isOn(d)&&balance(d)<0,
+  neg:d=>isOn(d)&&balance(d)!=null&&balance(d)<0,
   risk:d=>{const f=fById[d.id];return f.daysLeft!=null&&f.daysLeft<=7}
  };
  const card=d=>{
   const b=balance(d),on=isOn(d),f=fById[d.id];
-  const saldo=on?`<span class="${b<0?'dn':'up'}">${b<0?'▼':'▲'} ${b<0?'−':'+'}${energy(Math.abs(b))}/dia</span>`:'—';
+  const saldo=on&&b!=null?`<span class="${b<0?'dn':'up'}">${b<0?'▼':'▲'} ${b<0?'−':'+'}${energy(Math.abs(b))}/dia</span>`:'—';
   return `<div class="card">
    ${deviceCardHead(d,{showId:true})}
    <dl class="kv">
-    ${kvRow('Consumo',`${energy(d.consumption)}/dia`)}
+    ${kvRow('Consumo',perDay(d.consumption))}
     ${kvRow('Energia coletada',harvestText(d,'Sem harvesting'))}
     ${kvRow('Saldo energético',saldo)}
     ${kvRow('Autonomia prevista',daysTag(f)+(f.confidence==null?'':` <span class="mu">(${f.confidence}%)</span>`))}
