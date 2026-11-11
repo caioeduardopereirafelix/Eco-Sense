@@ -2,7 +2,14 @@
 const $=s=>document.querySelector(s),V=$('#view');
 const tag=s=>`<span class="tag s-${s}">${s}</span>`;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const num=n=>n.toLocaleString('pt-BR');
+/* ---------- formatação (a API manda números puros e datas ISO; aqui viram texto pt-BR) ---------- */
+/* num(3.4) → "3,4"; num(3.4,2) → "3,40" (casas fixas) */
+const num=(n,digits)=>Number(n).toLocaleString('pt-BR',digits==null?undefined:{minimumFractionDigits:digits,maximumFractionDigits:digits});
+const pct=n=>`${Number(n).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
+const kwh=(n,digits)=>`${num(n,digits)} kWh`;
+/* rótulo do eixo X a partir de um timestamp: passo 'hour' → "14h"; 'day' → "05/11" */
+const timeLabel=(iso,step)=>{const d=new Date(iso);
+ return step==='hour'?`${d.getHours()}h`:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`};
 /* Tag de autonomia: dias restantes (crítico ≤3, atenção ≤7), "Sustentável" ou "Sem leitura" */
 const daysTag=f=>f.daysLeft!=null
  ?`<span class="tag s-${f.daysLeft<=3?'Crítico':f.daysLeft<=7?'Atenção':'Normal'}">${f.daysLeft} ${f.daysLeft===1?'dia':'dias'}</span>`
@@ -27,7 +34,9 @@ function timeAgo(iso){
   if(Math.abs(s)>=sec)return rtf.format(Math.round(s/sec),unit);
  return'agora';
 }
-const alertHTML=a=>`<div class="alert a-${a.lv}${a.read?' read':''}"><span>${esc(a.ic)}</span><div><b>${esc(a.t)}</b><div class="mu">${esc(a.m)} · ${esc(a.w)}</div></div>${a.read?'':`<button class="btn" data-read="${a.id}">Marcar como lido</button>`}</div>`;
+/* alerta: level 'critical' | 'high' | 'warning' | 'info' define cor e ícone */
+const ALERT_ICONS={critical:'🔴',high:'🟠',warning:'🟡',info:'🟢'};
+const alertHTML=a=>`<div class="alert a-${esc(a.level)}${a.read?' read':''}"><span aria-hidden="true">${ALERT_ICONS[a.level]||'⚪'}</span><div><b>${esc(a.title)}</b><div class="mu">${esc(a.message)} · ${esc(timeAgo(a.createdAt))}</div></div>${a.read?'':`<button class="btn" data-read="${esc(a.id)}">Marcar como lido</button>`}</div>`;
 function filters(opts,cur,cb){const r=document.createElement('div');r.className='row';r.innerHTML=opts.map(([k,l])=>`<button class="btn${k===cur?' on':''}" data-k="${k}">${l}</button>`).join('');r.onclick=e=>{const k=e.target.dataset.k;if(k)cb(k)};return r}
 const kvRow=(l,v)=>`<dt>${l}</dt><dd>${v}</dd>`;
 /* Monta navegação, tema e roteamento por hash. NAV = [[chave,título],...]; pages = {chave: async()=>{}} */

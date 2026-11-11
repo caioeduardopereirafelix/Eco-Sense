@@ -22,19 +22,28 @@ const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}
    <div class="big" style="font-size:20px">${esc(d.name)}</div>
    <div style="margin-top:6px">${tag(d.status)}</div>
    ${bar(d.battery)}
-   <div class="mu">Bateria ${num(d.battery)}% · Última comunicação ${esc(d.lastSeen)}</div>`;
+   <div class="mu">Bateria ${num(d.battery)}% · Última comunicação ${esc(timeAgo(d.lastSeenAt))}</div>`;
 
 /* ---------- energia: fontes, baterias e consumidores ---------- */
-const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.n)}</h3><div class="big">${esc(x.e)}</div><div class="mu">Eficiência ${esc(x.ef)} · ${tag(x.st)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(x.up)}</div>`:''}</div>`;
+const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${kwh(x.energyKwh,2)}</div><div class="mu">Eficiência ${pct(x.efficiencyPct)} · ${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
 const batteryCard=x=>{
- const charging=x.st==='Carregando',filled=Math.round(x.pct/10);
+ const charging=x.status==='Carregando',filled=Math.round(x.pct/10);
  const cells=[...Array(10)].map((_,i)=>`<i style="${i<filled?`background:${charging?'var(--con)':col(x.pct)}`:''}"></i>`).join('');
- return `<div class="card"><h3>${esc(x.n)} · ${esc(x.tp)}</h3><div class="big">${num(x.pct)}<small>% de ${esc(x.cap)}</small></div>
-   <div class="batt">${cells}</div>${tag(x.st)}${charging?' <span class="mu">⚡ recebendo carga</span>':''}</div>`};
+ return `<div class="card"><h3>${esc(x.name)} · ${esc(x.type)}</h3><div class="big">${num(x.pct)}<small>% de ${kwh(x.capacityKwh)}</small></div>
+   <div class="batt">${cells}</div>${tag(x.status)}${charging?' <span class="mu">⚡ recebendo carga</span>':''}</div>`};
 /* barras com as 3 cargas de maior consumo (conteúdo do card, sem o card) */
 const topConsumers=loads=>{
- const top=[...loads].sort((a,b)=>b.c-a.c).slice(0,3),max=top.length&&top[0].c||1;
- return top.map(x=>`<div>${esc(x.n)} <span class="mu">${num(x.c)} W</span>${bar(x.c/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
+ const top=[...loads].sort((a,b)=>b.currentW-a.currentW).slice(0,3),max=top.length&&top[0].currentW||1;
+ return top.map(x=>`<div>${esc(x.name)} <span class="mu">${num(x.currentW)} W</span>${bar(x.currentW/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
+
+/* variação vs. ontem: ▲/▼ com a cor certa. higherIsGood: true para geração, false para consumo */
+const changeText=(changePct,higherIsGood,suffix=' vs. ontem')=>{
+ const up=changePct>=0,good=up===higherIsGood;
+ return `<span class="${good?'up':'dn'}">${up?'▲':'▼'} ${pct(Math.abs(changePct))}${suffix}</span>`};
+
+/* ---------- histórico: rótulos e unidade a partir da resposta da API ---------- */
+const historyLabels=h=>h.timestamps.map(t=>timeLabel(t,h.step));
+const historyUnit=h=>h.step==='hour'?'kWh/h':'kWh/dia';
 
 /* ---------- tela: histórico ----------
    custom: inclui o filtro "Personalizado" (admin); storageTitle: título do gráfico de bateria */
@@ -45,10 +54,11 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
   charts.forEach(c=>c.destroy());charts=[];
   V.innerHTML='';V.append(filters(options,k,draw));
   if(k==='custom')V.insertAdjacentHTML('beforeend','<div class="row"><input type="date" value="2026-09-23" aria-label="Data inicial"> até <input type="date" value="2026-10-06" aria-label="Data final"></div>');
-  V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${h.u})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${h.u})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>${esc(storageTitle)} (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
-  chart('c1','line',h.L,[lineDataset('--gen','Gerada',h.gen)]);
-  chart('c2','line',h.L,[lineDataset('--con','Consumida',h.con)]);
-  chart('c3','line',h.L,[lineDataset('--sto','Armazenada',h.sto)],{min:0,max:100})};
+  V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${historyUnit(h)})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${historyUnit(h)})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>${esc(storageTitle)} (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
+  const labels=historyLabels(h);
+  chart('c1','line',labels,[lineDataset('--gen','Gerada',h.generatedKwh)]);
+  chart('c2','line',labels,[lineDataset('--con','Consumida',h.consumedKwh)]);
+  chart('c3','line',labels,[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})};
  await draw('hoje')}
 
 /* ---------- tela: previsão de bateria ----------
@@ -76,10 +86,10 @@ async function renderForecast({detailed=false}={}){
   <div class="card"><h3>Em risco (até 7 dias)</h3><div class="big">${atRisk.length}</div><div class="mu">de ${withReading.length} dispositivos com leitura</div></div>
   <div class="card"><h3>Menor autonomia</h3><div class="big">${first?first.f.daysLeft:'—'} <small>${first?(first.f.daysLeft===1?'dia':'dias'):''}</small></div><div class="mu">${first?esc(first.d.name):'Nenhum dispositivo em esgotamento'}</div></div>
   <div class="card"><h3>Sustentáveis</h3><div class="big">${rows.filter(r=>r.f.sustainable).length}</div><div class="mu">coletam mais do que consomem</div></div>
-  ${detailed?`<div class="card"><h3>Contexto da previsão</h3><div class="big" style="font-size:22px">${esc(fc.season)}</div><div class="mu">Exposição solar média ${avgSun} h/dia · atualizado ${esc(fc.updatedAt)}</div></div>`:''}</div>
+  ${detailed?`<div class="card"><h3>Contexto da previsão</h3><div class="big" style="font-size:22px">${esc(fc.season)}</div><div class="mu">Exposição solar média ${avgSun} h/dia · atualizado ${esc(timeAgo(fc.updatedAt))}</div></div>`:''}</div>
   <div class="card" style="margin-bottom:16px"><h3>${detailed?'Autonomia estimada por dispositivo':'Quanto tempo cada bateria deve durar'}</h3>
    <div class="tw"><table class="${detailed?'pv':'pvu'}">${head}${rows.map(tr).join('')}</table></div>
-   ${detailed?'':`<div class="mu" style="margin-top:10px">Estimativas atualizadas ${esc(fc.updatedAt)}.</div>`}</div>
+   ${detailed?'':`<div class="mu" style="margin-top:10px">Estimativas atualizadas ${esc(timeAgo(fc.updatedAt))}.</div>`}</div>
   <div class="card" id="pcharts" style="margin-bottom:16px"><div class="row">
    <select id="pdev" aria-label="Dispositivo">${withReading.map(r=>`<option value="${esc(r.d.id)}"${r.d.id===sel?' selected':''}>${esc(r.d.name)}${detailed?` · ${esc(r.d.id)}`:''}</option>`).join('')}</select>
    <span id="prange"></span></div>
@@ -100,8 +110,10 @@ async function renderForecast({detailed=false}={}){
   charts.forEach(c=>c.destroy());charts=[];
   $('#pinfo').innerHTML=info(rows.find(x=>x.d.id===sel));
   const line=(c,label,data,dash)=>({borderColor:css(c),label,data,fill:false,borderDash:dash||[]});
-  chart('c1','line',s.L,[line('--con','Real',s.consumo.real),line('--gen','Previsto',s.consumo.pred,[6,4])],{min:0},[nowLine(s.now)]);
-  chart('c2','line',s.L,[line('--con','Real',s.bateria.real),line('--cr','Projeção',s.bateria.pred,[6,4])],{min:0,max:100},[nowLine(s.now)])};
+  /* rótulos relativos ao agora: "−3h", "agora", "+2d" */
+  const labels=s.timestamps.map((_,i)=>{const k=i-s.nowIndex;return k===0?'agora':`${k<0?'−':'+'}${Math.abs(k)}${s.step==='hour'?'h':'d'}`});
+  chart('c1','line',labels,[line('--con','Real',s.consumption.measured),line('--gen','Previsto',s.consumption.predicted,[6,4])],{min:0},[nowLine(s.nowIndex)]);
+  chart('c2','line',labels,[line('--con','Real',s.battery.measured),line('--cr','Projeção',s.battery.predicted,[6,4])],{min:0,max:100},[nowLine(s.nowIndex)])};
  $('#pdev').onchange=e=>{sel=e.target.value;drawCharts()};
  V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
  drawRange();await drawCharts()}
