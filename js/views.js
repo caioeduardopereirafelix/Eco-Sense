@@ -15,7 +15,7 @@ const withRead=list=>list.map(a=>({...a,read:readIds.has(String(a.id))}));
 
 /* ---------- dispositivos ---------- */
 const harvestText=(d,emptyLabel)=>d.harvesting
- ?`${num(d.harvesting.collected)} Wh <span class="mu">(${esc(d.harvesting.type)})</span>`
+ ?`${energy(d.harvesting.collected)}/dia <span class="mu">(${esc(d.harvesting.type)})</span>`
  :`<span class="mu">${emptyLabel}</span>`;
 /* topo comum dos cards de dispositivo: local, nome, status e bateria */
 const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}${esc(d.location)}</h3>
@@ -25,7 +25,7 @@ const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}
    <div class="mu">Bateria ${num(d.battery)}% · Última comunicação ${esc(timeAgo(d.lastSeenAt))}</div>`;
 
 /* ---------- energia: fontes, baterias e consumidores ---------- */
-const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${kwh(x.energyKwh,2)}</div><div class="mu">Eficiência ${pct(x.efficiencyPct)} · ${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
+const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${bigKwh(x.energyKwh)}</div><div class="mu">Eficiência ${pct(x.efficiencyPct)} · ${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
 const batteryCard=x=>{
  const charging=x.status==='Carregando',filled=Math.round(x.pct/10);
  const cells=[...Array(10)].map((_,i)=>`<i style="${i<filled?`background:${charging?'var(--con)':col(x.pct)}`:''}"></i>`).join('');
@@ -34,7 +34,7 @@ const batteryCard=x=>{
 /* barras com as 3 cargas de maior consumo (conteúdo do card, sem o card) */
 const topConsumers=loads=>{
  const top=[...loads].sort((a,b)=>b.currentW-a.currentW).slice(0,3),max=top.length&&top[0].currentW||1;
- return top.map(x=>`<div>${esc(x.name)} <span class="mu">${num(x.currentW)} W</span>${bar(x.currentW/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
+ return top.map(x=>`<div>${esc(x.name)} <span class="mu">${power(x.currentW)}</span>${bar(x.currentW/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
 
 /* variação vs. ontem: ▲/▼ com a cor certa. higherIsGood: true para geração, false para consumo */
 const changeText=(changePct,higherIsGood,suffix=' vs. ontem')=>{
@@ -47,7 +47,9 @@ const storageText=s=>s.capacityKwh!=null?`${kwh(s.storedKwh)} de ${kwh(s.capacit
 
 /* ---------- histórico: rótulos e unidade a partir da resposta da API ---------- */
 const historyLabels=h=>h.timestamps.map(t=>timeLabel(t,h.step));
-const historyUnit=h=>h.step==='hour'?'kWh/h':'kWh/dia';
+/* energia do histórico (kWh) na escala adequada: {unit:'mWh/h', gen:[…], con:[…]} */
+const historyEnergy=h=>{const toWh=l=>l.map(v=>v==null?null:v*1000),g=toWh(h.generatedKwh),c=toWh(h.consumedKwh),s=energyScale(g,c);
+ return{unit:`${s.unit}/${h.step==='hour'?'h':'dia'}`,gen:s.scale(g),con:s.scale(c)}};
 
 /* ---------- tela: histórico ----------
    custom: inclui o filtro "Personalizado" (admin); storageTitle: título do gráfico de bateria */
@@ -69,10 +71,11 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
    $('#hto').onchange=e=>{period.to=e.target.value;draw('custom')};
   }
   if(!h)return;
-  V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${historyUnit(h)})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${historyUnit(h)})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>${esc(storageTitle)} (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
+  V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>${esc(storageTitle)} (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
   const labels=historyLabels(h);
-  chart('c1','line',labels,[lineDataset('--gen','Gerada',h.generatedKwh)]);
-  chart('c2','line',labels,[lineDataset('--con','Consumida',h.consumedKwh)]);
+  const e=historyEnergy(h);
+  chart('c1','line',labels,[lineDataset('--gen','Gerada',e.gen)]);
+  chart('c2','line',labels,[lineDataset('--con','Consumida',e.con)]);
   chart('c3','line',labels,[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})};
  await draw('hoje')}
 
@@ -109,7 +112,7 @@ async function renderForecast({detailed=false}={}){
    <select id="pdev" aria-label="Dispositivo">${withReading.map(r=>`<option value="${esc(r.d.id)}"${r.d.id===sel?' selected':''}>${esc(r.d.name)}${detailed?` · ${esc(r.d.id)}`:''}</option>`).join('')}</select>
    <span id="prange"></span></div>
    <div class="mu" id="pinfo" style="margin-bottom:12px"></div>
-   <div class="grid g2" style="margin:0"><div><h3 class="mu" style="margin-bottom:8px">Consumo previsto × real (Wh)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+   <div class="grid g2" style="margin:0"><div><h3 class="mu" style="margin-bottom:8px">Consumo previsto × real (<span id="pcunit">Wh</span>)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
    <div><h3 class="mu" style="margin-bottom:8px">Nível de bateria projetado (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
    <div class="mu" style="margin-top:10px">A linha tracejada vertical marca o momento atual. Antes dela, dados medidos; depois, previsão.</div></div>`;
  const info=({f})=>{
@@ -127,7 +130,8 @@ async function renderForecast({detailed=false}={}){
   const line=(c,label,data,dash)=>({borderColor:css(c),label,data,fill:false,borderDash:dash||[]});
   /* rótulos relativos ao agora: "−3h", "agora", "+2d" */
   const labels=s.timestamps.map((_,i)=>{const k=i-s.nowIndex;return k===0?'agora':`${k<0?'−':'+'}${Math.abs(k)}${s.step==='hour'?'h':'d'}`});
-  chart('c1','line',labels,[line('--con','Real',s.consumption.measured),line('--gen','Previsto',s.consumption.predicted,[6,4])],{min:0},[nowLine(s.nowIndex)]);
+  const es=energyScale(s.consumption.measured,s.consumption.predicted);$('#pcunit').textContent=es.unit;
+  chart('c1','line',labels,[line('--con','Real',es.scale(s.consumption.measured)),line('--gen','Previsto',es.scale(s.consumption.predicted),[6,4])],{min:0},[nowLine(s.nowIndex)]);
   chart('c2','line',labels,[line('--con','Real',s.battery.measured),line('--cr','Projeção',s.battery.predicted,[6,4])],{min:0,max:100},[nowLine(s.nowIndex)])};
  $('#pdev').onchange=e=>{sel=e.target.value;drawCharts()};
  V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};

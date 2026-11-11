@@ -3,8 +3,10 @@ package br.com.ecosense.service;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
+import br.com.ecosense.config.EcoSenseProperties.Conversion;
 import br.com.ecosense.config.EcoSenseProperties.Fields;
 import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
 import br.com.ecosense.thingspeak.Feed;
@@ -35,6 +38,8 @@ public class ReadingService {
     private final Clock clock;
     private final Map<String, Cached<DeviceData>> deviceCache = new ConcurrentHashMap<>();
     private final Map<String, Cached<Double>> storageCache = new ConcurrentHashMap<>();
+    /** médias horárias já baixadas, por dispositivo (para a busca incremental) */
+    private final Map<String, List<Reading>> hourlyStore = new ConcurrentHashMap<>();
 
     public ReadingService(ThingSpeakClient client, EcoSenseProperties props, Clock clock) {
         this.client = client;
@@ -72,10 +77,9 @@ public class ReadingService {
         try {
             String key = keyFor(d.readApiKey());
             List<Feed> last = client.latest(d.channelId(), key, 1);
-            List<Feed> hourly = client.averaged(d.channelId(), key, now.minus(Duration.ofDays(HISTORY_DAYS)), now, 60);
             DeviceData data = new DeviceData(
-                    last.isEmpty() ? null : toReading(last.get(last.size() - 1), d.fields()),
-                    hourly.stream().map(f -> toReading(f, d.fields())).toList());
+                    last.isEmpty() ? null : toReading(last.get(last.size() - 1), d.fields(), d.conversion()),
+                    hourly(d, key, now));
             deviceCache.put(d.id(), new Cached<>(now, data));
             return data;
         } catch (RuntimeException e) {
@@ -85,6 +89,44 @@ public class ReadingService {
             deviceCache.put(d.id(), new Cached<>(now, fallback));
             return fallback;
         }
+    }
+
+    /**
+     * Médias horárias dos últimos {@value #HISTORY_DAYS} dias.
+     * O ThingSpeak lê no máximo 8000 entradas por requisição ANTES de calcular as médias; em canais que
+     * enviam a cada poucos segundos isso cobre só alguns dias. Por isso:
+     * - na primeira vez, busca em pedaços de {@code history-chunk-days} dias;
+     * - nas seguintes, busca só as últimas horas e junta ao que já tinha (incremental).
+     */
+    private List<Reading> hourly(DeviceConfig d, String key, Instant now) {
+        Instant from = now.minus(Duration.ofDays(HISTORY_DAYS));
+        List<Reading> stored = hourlyStore.getOrDefault(d.id(), List.of());
+        Map<Instant, Reading> byHour = new TreeMap<>();
+        Instant fetchFrom;
+        if (stored.isEmpty()) {
+            fetchFrom = from;
+        } else {
+            /* refaz as 2 últimas horas (a hora corrente ainda está mudando) */
+            fetchFrom = stored.get(stored.size() - 1).at().truncatedTo(ChronoUnit.HOURS).minus(Duration.ofHours(1));
+            for (Reading r : stored) {
+                if (!r.at().isBefore(from) && r.at().isBefore(fetchFrom)) byHour.put(hourOf(r), r);
+            }
+        }
+        Duration chunk = Duration.ofDays(d.historyChunkDays());
+        for (Instant start = fetchFrom; start.isBefore(now); start = start.plus(chunk)) {
+            Instant end = start.plus(chunk).isAfter(now) ? now : start.plus(chunk);
+            for (Feed f : client.averaged(d.channelId(), key, start, end, 60)) {
+                Reading r = toReading(f, d.fields(), d.conversion());
+                byHour.put(hourOf(r), r);
+            }
+        }
+        List<Reading> merged = List.copyOf(byHour.values());
+        hourlyStore.put(d.id(), merged);
+        return merged;
+    }
+
+    private static Instant hourOf(Reading r) {
+        return r.at().truncatedTo(ChronoUnit.HOURS);
     }
 
     /** O ThingSpeak responde "-1" quando o canal é privado e a Read API Key está ausente ou errada. */
@@ -104,7 +146,7 @@ public class ReadingService {
         if (s.channelId() == null) return null;
         try {
             List<Feed> last = client.latest(s.channelId(), keyFor(s.readApiKey()), 1);
-            Double pct = last.isEmpty() ? null : last.get(last.size() - 1).number(s.field());
+            Double pct = last.isEmpty() ? null : s.conversion().battery(last.get(last.size() - 1).number(s.field()));
             storageCache.put(s.name(), new Cached<>(now, pct));
             return pct;
         } catch (RuntimeException e) {
@@ -119,8 +161,12 @@ public class ReadingService {
         return specific != null && !specific.isBlank() ? specific : props.thingspeak().readApiKey();
     }
 
-    static Reading toReading(Feed f, Fields m) {
-        return new Reading(f.createdAt(), f.number(m.battery()), f.number(m.consumption()),
-                f.number(m.temperature()), f.number(m.harvested()));
+    /** Lê os fields mapeados e converte para as unidades do EcoSense (%, W, °C). */
+    static Reading toReading(Feed f, Fields m, Conversion c) {
+        return new Reading(f.createdAt(),
+                c.battery(f.number(m.battery())),
+                c.consumption(f.number(m.consumption())),
+                c.temperature(f.number(m.temperature())),
+                c.harvested(f.number(m.harvested())));
     }
 }

@@ -3,26 +3,26 @@
 const pages={
 async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(),api.getAlerts(),api.getHistory('hoje')]);
  V.innerHTML=`<div class="grid">
- <div class="card"><h3>Energia gerada</h3><div class="big">${num(o.generation.todayKwh)} <small>kWh</small></div>${changeText(o.generation.changePct,true)}</div>
- <div class="card"><h3>Energia consumida</h3><div class="big">${num(o.consumption.nowW)} <small>W agora</small></div><div class="mu">Período: ${kwh(o.consumption.todayKwh)} · ${changeText(o.consumption.changePct,false,'')}</div></div>
+ <div class="card"><h3>Energia gerada</h3><div class="big">${bigKwh(o.generation.todayKwh)}</div>${changeText(o.generation.changePct,true)}</div>
+ <div class="card"><h3>Energia consumida</h3><div class="big">${bigPower(o.consumption.nowW)} <small>agora</small></div><div class="mu">Período: ${kwh(o.consumption.todayKwh)} · ${changeText(o.consumption.changePct,false,'')}</div></div>
  <div class="card"><h3>Energia armazenada</h3><div class="big">${o.storage.pct==null?"—":num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct||0,'var(--sto)')}<div class="mu">${storageText(o.storage)} · ${tag(o.storage.status)}</div></div>
  <div class="card"><h3>Dispositivos</h3><div class="big">${num(o.devices.total)}</div><div class="mu"><span class="s-Online">● ${num(o.devices.online)} online</span> · <span class="s-Offline">● ${num(o.devices.offline)} offline</span></div></div></div>
- <div class="grid g2"><div class="card"><h3>Gerada × consumida hoje (kWh/h)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+ <div class="grid g2"><div class="card"><h3>Gerada × consumida hoje (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>
  <div class="card"><h3>Nível de armazenamento hoje (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
  <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
  const drawAlerts=()=>{$('#recent').innerHTML=a.length?withRead(a).slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
  V.onclick=e=>{const b=e.target.closest('[data-read]');if(b){readIds.add(b.dataset.read);drawAlerts()}};
  drawAlerts();
- chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',h.generatedKwh),lineDataset('--con','Consumida',h.consumedKwh)]);
+ chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  chart('c2','line',historyLabels(h),[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})},
 async geracao(){const s=await api.getSources(),h=await api.getHistory('7d');
  V.innerHTML=`<div class="grid">${s.map(x=>sourceCard(x,{showUpdated:true})).join('')}</div>
- <div class="card"><h3>Geração ao longo da semana (kWh/dia)</h3><div class="chart"><canvas id="c1"></canvas></div></div>`;
- chart('c1','line',historyLabels(h),[lineDataset('--gen','Total gerado',h.generatedKwh)])},
+ <div class="card"><h3>Geração ao longo da semana (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>`;
+ chart('c1','line',historyLabels(h),[lineDataset('--gen','Total gerado',historyEnergy(h).gen)])},
 async consumo(){const l=await api.getLoads();
  V.innerHTML=`<div class="row"><button class="btn${eco?' on':''}" id="eco">${eco?'Modo Economia ativo':'Ativar Modo Economia'}</button></div>${eco?'<div class="banner">Modo Economia ativo: cargas de baixa prioridade reduzidas (simulação visual).</div>':''}
  <div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
- ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>{const c=eco&&p==='Baixa'?Math.round(x.currentW*.5):x.currentW;return`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${num(c)} W</td><td>${num(x.avgW)} W</td><td>${tag(x.status)}</td></tr>`}).join('')}</table></div></div>`).join('')}`;
+ ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>{const c=eco&&p==='Baixa'?x.currentW*.5:x.currentW;return`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(c)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`}).join('')}</table></div></div>`).join('')}`;
  $('#eco').onclick=()=>{eco=!eco;pages.consumo()}},
 async armazenamento(){const b=await api.getBatteries();
  V.innerHTML=`<div class="grid g2">${b.map(batteryCard).join('')}</div>`},
@@ -146,11 +146,11 @@ async dispositivos(){
  };
  const card=d=>{
   const b=balance(d),on=isOn(d),f=fById[d.id];
-  const saldo=on?`<span class="${b<0?'dn':'up'}">${b<0?'▼':'▲'} ${b>0?'+':''}${num(b)} Wh</span>`:'—';
+  const saldo=on?`<span class="${b<0?'dn':'up'}">${b<0?'▼':'▲'} ${b<0?'−':'+'}${energy(Math.abs(b))}/dia</span>`:'—';
   return `<div class="card">
    ${deviceCardHead(d,{showId:true})}
    <dl class="kv">
-    ${kvRow('Consumo',`${num(d.consumption)} Wh`)}
+    ${kvRow('Consumo',`${energy(d.consumption)}/dia`)}
     ${kvRow('Energia coletada',harvestText(d,'Sem harvesting'))}
     ${kvRow('Saldo energético',saldo)}
     ${kvRow('Autonomia prevista',daysTag(f)+(f.confidence==null?'':` <span class="mu">(${f.confidence}%)</span>`))}

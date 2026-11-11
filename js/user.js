@@ -19,7 +19,7 @@ async function userAlerts(){
  const o=await api.getOverview();
  const list=alertsBase.filter(a=>a.level==='critical'?prefs.critical:a.level==='high'?prefs.high:true);
  const nowW=o.consumption.nowW;
- if(prefs.high&&nowW>prefs.limit)list.unshift({id:'limit',level:'high',title:'Consumo acima do seu limite',message:`Consumo atual de ${num(nowW)} W, acima do limite de ${num(prefs.limit)} W.`,createdAt:new Date().toISOString()});
+ if(prefs.high&&nowW>prefs.limit)list.unshift({id:'limit',level:'high',title:'Consumo acima do seu limite',message:`Consumo atual de ${power(nowW)}, acima do limite de ${num(prefs.limit)} W.`,createdAt:new Date().toISOString()});
  return withRead(list);
 }
 function bindAlerts(redraw){
@@ -41,13 +41,13 @@ async inicio(){
   ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção. <a href="#dispositivos">Ver meus dispositivos</a></div>`
   :'<div class="banner" style="border-color:var(--ok)">Tudo certo com os seus dispositivos.</div>';
  V.innerHTML=`${banner}<div class="grid">
-  <div class="card"><h3>Energia gerada hoje</h3><div class="big">${num(o.generation.todayKwh)} <small>kWh</small></div>${changeText(o.generation.changePct,true)}</div>
-  <div class="card"><h3>Consumo agora</h3><div class="big">${num(o.consumption.nowW)} <small>W</small></div><div class="mu">Hoje: ${kwh(o.consumption.todayKwh)}</div></div>
+  <div class="card"><h3>Energia gerada hoje</h3><div class="big">${bigKwh(o.generation.todayKwh)}</div>${changeText(o.generation.changePct,true)}</div>
+  <div class="card"><h3>Consumo agora</h3><div class="big">${bigPower(o.consumption.nowW)}</div><div class="mu">Hoje: ${kwh(o.consumption.todayKwh)}</div></div>
   <div class="card"><h3>Bateria armazenada</h3><div class="big">${o.storage.pct==null?"—":num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct||0,'var(--sto)')}<div class="mu">${storageText(o.storage)}</div></div>
   <div class="card"><h3>Dispositivos online</h3><div class="big">${online} <small>de ${devices.length}</small></div><div class="mu">${devices.length-online} offline</div></div></div>
-  <div class="card" style="margin-bottom:16px"><h3>Gerada × consumida hoje (kWh/h)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
+  <div class="card" style="margin-bottom:16px"><h3>Gerada × consumida hoje (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>
   <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
- chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',h.generatedKwh),lineDataset('--con','Consumida',h.consumedKwh)]);
+ chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  const drawAlerts=async()=>{const l=await userAlerts();$('#recent').innerHTML=l.length?l.slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
  bindAlerts(drawAlerts);drawAlerts()},
 
@@ -73,7 +73,7 @@ async dispositivos(){
    ${deviceCardHead(d)}
    <dl class="kv">
     ${kvRow('Autonomia prevista',daysTag(f))}
-    ${kvRow('Consumo',`${num(d.consumption)} Wh`)}
+    ${kvRow('Consumo',`${energy(d.consumption)}/dia`)}
     ${kvRow('Energia coletada',harvestText(d,'Sem coleta de energia'))}
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
    </dl>${action}</div>`};

@@ -31,13 +31,35 @@ As origens liberadas no CORS ficam em `ecosense.cors-origins`.
 
 Testes: `./mvnw test`
 
-## Rodar com o canal real (perfil `thingspeak`)
+## Rodar com dados reais (perfil `thingspeak`)
 
-O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspeak.yml) já aponta para o
-canal **3574018** ("EcoSense - Sensor 01": field1 bateria %, field2 consumo W, field3 temperatura °C,
-field4 energia coletada W) e desliga a simulação.
+O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspeak.yml) desliga a simulação e
+lê **canais públicos** do ThingSpeak com dados reais e ativos (não precisam de chave):
 
-**Onde colocar a Read API Key** (aba "API Keys" do canal → "Read API Keys") — escolha uma:
+| No EcoSense | Canal | Origem | Leituras usadas |
+|---|---|---|---|
+| Dispositivo IOT-001 | [2988514](https://thingspeak.mathworks.com/channels/2988514) "[Harveo] Indoor tests @ INA3221" | Projeto EMBEDO Harveo — coletor de energia com mini painel solar indoor, Gdańsk (PL) | bateria (V → %), potência da bateria (mW → consumo W), potência do painel (mW → coleta W) |
+| Dispositivo IOT-002 | [3124603](https://thingspeak.mathworks.com/channels/3124603) "EMBEDO Node" | Mesmo laboratório | carga do UPS (%), temperatura (°C) |
+| Armazenamento | [1276112](https://thingspeak.mathworks.com/channels/1276112) "Solarakku" | Banco de baterias solar LiFePO4 24 V / 320 Ah (~8 kWh), Hoyerswerda (DE) | tensão da célula 1 (V → %) |
+
+Os dados são de terceiros: **cite os canais como fonte** no trabalho acadêmico.
+
+O Harveo trabalha com **miliwatts** (painel ~0,7 mW de dia, consumo ~0,1 mW), escala típica de
+*energy harvesting*. Por isso a API devolve potência e energia com 4 algarismos significativos (sem
+arredondar para 0) e o front escolhe a unidade (µW/mW/W, µWh/mWh/Wh/kWh) conforme o valor.
+
+**Conversões** (`conversion` no YAML): `battery-voltage-min/max` lê a bateria em volts e converte
+linearmente para %; `consumption-scale`/`harvested-scale` multiplicam as potências (ex.: `0.001` para
+mW → W; negativo inverte o sinal). Use `none` em `fields` para uma leitura que o canal não tem.
+
+**Canais que enviam a cada poucos segundos:** o ThingSpeak lê no máximo 8000 entradas por pedido antes de
+calcular as médias. `history-chunk-days` divide a primeira carga do histórico em pedaços (ex.: `2` para um
+canal de 30 s); depois o back-end busca só as horas novas.
+
+### Canal próprio (privado)
+
+Para usar um canal privado, como o 3574018 criado para o projeto (exemplo comentado no perfil), é preciso
+a Read API Key. **Onde colocar a Read API Key** (aba "API Keys" do canal → "Read API Keys") — escolha uma:
 
 - **Arquivo `backend/.env`** (recomendado): copie [`.env.example`](.env.example) para `.env` e preencha
   `THINGSPEAK_READ_API_KEY=...`. O back-end lê esse arquivo ao iniciar (ou um `.env` na pasta de onde
@@ -68,7 +90,8 @@ https://api.thingspeak.com/update?api_key=SUA_WRITE_API_KEY&field1=87&field2=0.5
 ```
 
 A resposta é o número da entrada (ou `0` se enviar de novo antes de 15 s, limite do plano gratuito).
-Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses valores.
+Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses valores
+(com o dispositivo IOT-003 descomentado no perfil).
 
 ## Conectar outros canais ao ThingSpeak
 

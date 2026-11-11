@@ -75,8 +75,8 @@ public class HistoryService {
                 storage.add(null);
                 continue;
             }
-            generated.add(Stats.round(sumKwh(inSlot, Reading::harvestedW), 2));
-            consumed.add(Stats.round(sumKwh(inSlot, Reading::consumptionW), 2));
+            generated.add(Stats.sig(sumKwh(inSlot, Reading::harvestedW)));
+            consumed.add(Stats.sig(sumKwh(inSlot, Reading::consumptionW)));
             Double avgBattery = Stats.mean(inSlot.stream().map(rs -> Stats.mean(rs, Reading::battery)).toList());
             storage.add(avgBattery == null ? null : (double) Math.round(avgBattery));
         }

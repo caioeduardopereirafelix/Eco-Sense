@@ -7,7 +7,26 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const num=(n,digits)=>Number(n).toLocaleString('pt-BR',digits==null?undefined:{minimumFractionDigits:digits,maximumFractionDigits:digits});
 /* valores ausentes (null) aparecem como "—" */
 const pct=n=>n==null?'—':`${Number(n).toLocaleString('pt-BR',{maximumFractionDigits:1})}%`;
-const kwh=(n,digits)=>n==null?'—':`${num(n,digits)} kWh`;
+/* casas decimais conforme o tamanho: 312 → "312"; 48,5 → "48,5"; 4,82 → "4,82" */
+const smart=n=>{const a=Math.abs(n);return Number(n).toLocaleString('pt-BR',{maximumFractionDigits:a>=100?0:a>=10?1:2})};
+/* Potência e energia variam de microwatts (energy harvesting) a quilowatts: a unidade acompanha o valor.
+   powerParts(0.00045) → ['0,45','mW']; energyParts(4820) → ['4,82','kWh'] */
+const powerParts=w=>{const a=Math.abs(w);
+ if(a>=1||a===0)return[smart(w),'W'];if(a>=0.0001)return[smart(w*1e3),'mW'];return[smart(w*1e6),'µW']};
+const energyParts=wh=>{const a=Math.abs(wh);
+ if(a>=100)return[smart(wh/1e3),'kWh'];if(a>=1||a===0)return[smart(wh),'Wh'];if(a>=0.001)return[smart(wh*1e3),'mWh'];return[smart(wh*1e6),'µWh']};
+const power=w=>w==null?'—':powerParts(w).join(' ');
+const energy=wh=>wh==null?'—':energyParts(wh).join(' ');
+const kwh=n=>n==null?'—':energy(n*1000);
+/* para os números grandes dos cards: "4,82 <small>kWh</small>" */
+const bigPower=w=>w==null?'—':(([v,u])=>`${v} <small>${u}</small>`)(powerParts(w));
+const bigKwh=n=>n==null?'—':(([v,u])=>`${v} <small>${u}</small>`)(energyParts(n*1000));
+/* escala comum para uma série de gráfico em Wh: escolhe a unidade pelo maior valor */
+function energyScale(...seriesWh){
+ const max=Math.max(0,...seriesWh.flat().filter(v=>v!=null).map(Math.abs));
+ const [unit,factor]=max>=100?['kWh',1e-3]:max>=1||max===0?['Wh',1]:max>=0.001?['mWh',1e3]:['µWh',1e6];
+ return{unit,scale:list=>list.map(v=>v==null?null:+(v*factor).toPrecision(4))};
+}
 /* rótulo do eixo X a partir de um timestamp: passo 'hour' → "14h"; 'day' → "05/11" */
 const timeLabel=(iso,step)=>{const d=new Date(iso);
  return step==='hour'?`${d.getHours()}h`:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`};

@@ -23,6 +23,7 @@ Sensores IoT ──▶ ThingSpeak (canais/fields) ──▶ Back-end Java ──
 |---|---|
 | Números puros, nunca texto formatado | `"energyKwh": 3.4` (não `"3,40 kWh"`) |
 | Unidade no nome do campo | `currentW`, `capacityKwh`, `efficiencyPct` |
+| Potência e energia com 4 algarismos significativos (nunca arredondar para 0) | `"nowW": 0.000125`, `"todayKwh": 4.758E-6` |
 | Datas em ISO 8601 com fuso | `"2026-11-10T14:05:00Z"` |
 | Datas sem hora (agendamento) | `"2026-11-21"` |
 | Valor ausente | `null` (não omitir o campo, não usar `""`) |

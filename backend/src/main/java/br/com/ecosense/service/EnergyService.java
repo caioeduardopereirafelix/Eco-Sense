@@ -73,8 +73,8 @@ public class EnergyService {
         }
 
         return new Overview(
-                new Generation(Stats.round(genToday, 2), change(genToday, genYesterday)),
-                new Consumption(Stats.round(nowW, 1), Stats.round(conToday, 2), change(conToday, conYesterday)),
+                new Generation(Stats.sig(genToday), change(genToday, genYesterday)),
+                new Consumption(Stats.sig(nowW), Stats.sig(conToday), change(conToday, conYesterday)),
                 storage(deviceBatteries),
                 new DeviceCount(all.size(), online, all.size() - online));
     }
@@ -114,7 +114,7 @@ public class EnergyService {
                     .map(Reading::at).max(Comparator.naturalOrder())
                     .map(t -> t.truncatedTo(ChronoUnit.SECONDS)).orElse(null);
             /* eficiência exige saber a energia disponível no ambiente; null até existir esse dado */
-            result.add(new Source(type, Stats.round(kwh, 2), null, anyOnline ? "Normal" : "Atenção", updatedAt));
+            result.add(new Source(type, Stats.sig(kwh), null, anyOnline ? "Normal" : "Atenção", updatedAt));
         });
         return result;
     }
@@ -127,7 +127,7 @@ public class EnergyService {
             boolean online = devices.isOnline(d, data);
             double current = online && data.latest().consumptionW() != null ? data.latest().consumptionW() : 0;
             Double avg = Stats.mean(DeviceService.since(data.hourly(), weekAgo), Reading::consumptionW);
-            return new Load(d.name(), d.type(), Stats.round(current, 1), avg == null ? 0 : Stats.round(avg, 1),
+            return new Load(d.name(), d.type(), Stats.sig(current), avg == null ? 0 : Stats.sig(avg),
                     d.priority(), loadStatus(online, data, current, avg));
         }).toList();
     }
@@ -169,7 +169,7 @@ public class EnergyService {
             Double current = data.latest().consumptionW();
             if (current != null && avg != null && avg > 0 && current > 1.5 * avg) {
                 alerts.add(new Alert(d.id() + ":consumption", "high", "Consumo elevado",
-                        dev.name() + " está consumindo " + fmt(current) + " W, acima da média de " + fmt(avg) + " W.", at));
+                        dev.name() + " está consumindo " + fmt(current) + ", acima da média de " + fmt(avg) + ".", at));
             }
         }
         Period p = period();
@@ -224,7 +224,12 @@ public class EnergyService {
         };
     }
 
-    private static String fmt(double w) {
-        return String.format(java.util.Locale.of("pt", "BR"), "%.1f", w);
+    /** Potência com a unidade adequada: "1,2 W", "0,45 mW", "80 µW". */
+    static String fmt(double w) {
+        java.util.Locale br = java.util.Locale.of("pt", "BR");
+        double abs = Math.abs(w);
+        if (abs >= 1 || abs == 0) return String.format(br, "%.1f W", w);
+        if (abs >= 0.0001) return String.format(br, "%.2f mW", w * 1000);
+        return String.format(br, "%.0f µW", w * 1_000_000);
     }
 }

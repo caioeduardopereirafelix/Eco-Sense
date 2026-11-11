@@ -106,9 +106,9 @@ public class ForecastService {
             /* consumo em Wh por passo: média em W × horas do passo */
             double hours = hourly ? 1 : 24;
             Double measuredW = i <= past ? Stats.mean(inSlot, Reading::consumptionW) : null;
-            consMeasured.add(measuredW == null ? null : Stats.round(measuredW * hours, 1));
+            consMeasured.add(measuredW == null ? null : Stats.sig(measuredW * hours));
             Double predictedW = hourly ? sameHourAverage(lastWeek, slot.getHour(), weekAvgW) : weekAvgW;
-            consPredicted.add(predictedW == null ? null : Stats.round(predictedW * hours, 1));
+            consPredicted.add(predictedW == null ? null : Stats.sig(predictedW * hours));
 
             Double measuredBatt = i <= past ? Stats.mean(inSlot, Reading::battery) : null;
             battMeasured.add(measuredBatt == null ? null : (double) Math.round(measuredBatt));

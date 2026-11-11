@@ -37,6 +37,15 @@ final class Stats {
         return value == null ? null : round(value.doubleValue(), decimals);
     }
 
+    /**
+     * Arredonda para 4 algarismos significativos. Usado em potência e energia, que variam de
+     * microwatts (energy harvesting) a quilowatts: 0,000112 continua 0,000112, e 312,456 vira 312,5.
+     */
+    static double sig(double value) {
+        if (value == 0 || !Double.isFinite(value)) return value == 0 ? 0 : value;
+        return new java.math.BigDecimal(value).round(new java.math.MathContext(4)).doubleValue();
+    }
+
     static double clamp(double v, double min, double max) {
         return Math.max(min, Math.min(max, v));
     }

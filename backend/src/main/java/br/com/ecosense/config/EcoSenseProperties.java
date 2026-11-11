@@ -54,6 +54,10 @@ public record EcoSenseProperties(
      * @param harvestingType Solar | Térmico | Cinético… (null = não coleta energia)
      * @param sunHours       horas de sol por dia no local (null se não usa solar)
      * @param readApiKey     sobrescreve a chave padrão para este canal
+     * @param historyChunkDays tamanho (dias) de cada pedido do histórico na primeira carga. O ThingSpeak
+     *                       lê no máximo 8000 entradas por pedido: use ~2 para canais que enviam a cada
+     *                       30 s, ~27 para 5 min. Padrão 31 (um pedido só).
+     * @param conversion     converte as unidades do canal para as do EcoSense (ex.: V → %, mW → W)
      * @param sim            parâmetros do modo simulado (ignorado com o ThingSpeak real)
      */
     public record DeviceConfig(
@@ -61,21 +65,24 @@ public record EcoSenseProperties(
             Double latitude, Double longitude,
             Integer txInterval, String type, String priority,
             String harvestingType, Double sunHours,
-            Long channelId, String readApiKey,
-            Fields fields, Simulation sim) {
+            Long channelId, String readApiKey, Integer historyChunkDays,
+            Fields fields, Conversion conversion, Simulation sim) {
 
         public DeviceConfig {
+            historyChunkDays = historyChunkDays != null && historyChunkDays > 0 ? historyChunkDays : 31;
             txInterval = txInterval != null ? txInterval : 5;
             type = type != null ? type : "Sensor";
             priority = priority != null ? priority : "Média";
             fields = fields != null ? fields : new Fields(null, null, null, null);
+            conversion = conversion != null ? conversion : Conversion.NONE;
             sim = sim != null ? sim : Simulation.DEFAULT;
         }
     }
 
     /**
-     * Em qual field do canal está cada leitura. Unidades esperadas no ThingSpeak:
-     * battery em %, consumption em W, temperature em °C, harvested em W.
+     * Em qual field do canal está cada leitura. Unidades esperadas no ThingSpeak (ou após a
+     * {@link Conversion}): battery em %, consumption em W, temperature em °C, harvested em W.
+     * Use {@code none} para uma leitura que o canal não tem.
      */
     public record Fields(String battery, String consumption, String temperature, String harvested) {
         public Fields {
@@ -86,16 +93,63 @@ public record EcoSenseProperties(
         }
     }
 
-    /** Bateria/armazenamento do sistema: lê o percentual de carga de um field de um canal. */
+    /**
+     * Bateria/armazenamento do sistema: lê a carga de um field de um canal
+     * (em %, ou em volts com {@code conversion.battery-voltage-min/max}).
+     */
     public record StorageConfig(
             String name, String type, Double capacityKwh,
-            Long channelId, String readApiKey, String field, Simulation sim) {
+            Long channelId, String readApiKey, String field, Conversion conversion, Simulation sim) {
 
         public StorageConfig {
             type = type != null ? type : "Bateria";
             capacityKwh = capacityKwh != null ? capacityKwh : 0d;
             field = field != null ? field : "field1";
+            conversion = conversion != null ? conversion : Conversion.NONE;
             sim = sim != null ? sim : Simulation.DEFAULT;
+        }
+    }
+
+    /**
+     * Conversão das leituras do canal para as unidades do EcoSense.
+     *
+     * @param batteryVoltageMin tensão da bateria vazia (V). Com min e max definidos, o field de
+     *                          bateria é lido como tensão e convertido linearmente para %
+     * @param batteryVoltageMax tensão da bateria cheia (V)
+     * @param consumptionScale  multiplica o consumo (ex.: 0.001 para mW → W; negativo inverte o sinal)
+     * @param harvestedScale    multiplica a energia coletada (ex.: 0.001 para mW → W)
+     * @param temperatureScale  multiplica a temperatura
+     */
+    public record Conversion(Double batteryVoltageMin, Double batteryVoltageMax,
+                             Double consumptionScale, Double harvestedScale, Double temperatureScale) {
+
+        public static final Conversion NONE = new Conversion(null, null, null, null, null);
+
+        public Conversion {
+            consumptionScale = consumptionScale != null ? consumptionScale : 1d;
+            harvestedScale = harvestedScale != null ? harvestedScale : 1d;
+            temperatureScale = temperatureScale != null ? temperatureScale : 1d;
+        }
+
+        /** % de bateria: tensão convertida (limitada a 0–100) ou o valor como veio. */
+        public Double battery(Double raw) {
+            if (raw == null) return null;
+            if (batteryVoltageMin == null || batteryVoltageMax == null || batteryVoltageMax <= batteryVoltageMin) return raw;
+            double pct = (raw - batteryVoltageMin) / (batteryVoltageMax - batteryVoltageMin) * 100;
+            return Math.max(0, Math.min(100, pct));
+        }
+
+        /** Potência nunca é negativa: valores abaixo de zero viram 0. */
+        public Double consumption(Double raw) {
+            return raw == null ? null : Math.max(0, raw * consumptionScale);
+        }
+
+        public Double harvested(Double raw) {
+            return raw == null ? null : Math.max(0, raw * harvestedScale);
+        }
+
+        public Double temperature(Double raw) {
+            return raw == null ? null : raw * temperatureScale;
         }
     }
 
