@@ -64,9 +64,21 @@ public class ReadingService {
             deviceCache.put(d.id(), new Cached<>(now, data));
             return data;
         } catch (RuntimeException e) {
-            log.warn("Falha ao ler o canal {} ({}) no ThingSpeak: {}", d.channelId(), d.id(), e.getMessage());
-            return cached != null ? cached.value() : DeviceData.EMPTY;
+            warnFailure(d.channelId(), d.id(), e);
+            /* guarda também a falha: evita repetir a chamada a cada requisição até o cache vencer */
+            DeviceData fallback = cached != null ? cached.value() : DeviceData.EMPTY;
+            deviceCache.put(d.id(), new Cached<>(now, fallback));
+            return fallback;
         }
+    }
+
+    /** O ThingSpeak responde "-1" quando o canal é privado e a Read API Key está ausente ou errada. */
+    private static void warnFailure(Long channelId, String name, RuntimeException e) {
+        String message = String.valueOf(e.getMessage());
+        String hint = message.contains("\"-1\"")
+                ? " — canal privado sem Read API Key válida: defina THINGSPEAK_READ_API_KEY (ou torne o canal público)."
+                : "";
+        log.warn("Falha ao ler o canal {} ({}) no ThingSpeak: {}{}", channelId, name, message, hint);
     }
 
     /** Percentual de carga de uma bateria do sistema (null se indisponível). */
@@ -81,8 +93,10 @@ public class ReadingService {
             storageCache.put(s.name(), new Cached<>(now, pct));
             return pct;
         } catch (RuntimeException e) {
-            log.warn("Falha ao ler o canal {} ({}) no ThingSpeak: {}", s.channelId(), s.name(), e.getMessage());
-            return cached != null ? cached.value() : null;
+            warnFailure(s.channelId(), s.name(), e);
+            Double fallback = cached != null ? cached.value() : null;
+            storageCache.put(s.name(), new Cached<>(now, fallback));
+            return fallback;
         }
     }
 

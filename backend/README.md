@@ -31,9 +31,39 @@ As origens liberadas no CORS ficam em `ecosense.cors-origins`.
 
 Testes: `./mvnw test`
 
-## Conectar ao ThingSpeak
+## Rodar com o canal real (perfil `thingspeak`)
 
-1. Em [`src/main/resources/application.yml`](src/main/resources/application.yml), para cada dispositivo
+O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspeak.yml) já aponta para o
+canal **3574018** ("EcoSense - Sensor 01": field1 bateria %, field2 consumo W, field3 temperatura °C,
+field4 energia coletada W) e desliga a simulação.
+
+```powershell
+# Windows (PowerShell) — copie a Read API Key da aba "API Keys" do canal
+$env:THINGSPEAK_READ_API_KEY='SUA_READ_API_KEY'
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=thingspeak"
+```
+
+```bash
+# Linux/macOS
+export THINGSPEAK_READ_API_KEY=SUA_READ_API_KEY
+./mvnw spring-boot:run -Dspring-boot.run.profiles=thingspeak
+```
+
+Sem a chave (canal privado), o ThingSpeak responde `-1`: a API continua no ar, o dispositivo aparece
+Offline e o log avisa para definir `THINGSPEAK_READ_API_KEY`.
+
+**Testar sem a placa:** envie uma leitura pelo navegador com a *Write API Key* (aba "API Keys"):
+
+```
+https://api.thingspeak.com/update?api_key=SUA_WRITE_API_KEY&field1=87&field2=0.5&field3=24&field4=0.6
+```
+
+A resposta é o número da entrada (ou `0` se enviar de novo antes de 15 s, limite do plano gratuito).
+Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses valores.
+
+## Conectar outros canais ao ThingSpeak
+
+1. Em [`src/main/resources/application.yml`](src/main/resources/application.yml) (ou no perfil `thingspeak`), para cada dispositivo
    em `ecosense.devices`, coloque o `channel-id` real e diga em qual field está cada leitura:
 
    ```yaml

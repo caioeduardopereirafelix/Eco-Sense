@@ -1,0 +1,33 @@
+# Perfil com os canais REAIS do ThingSpeak.
+# Ativar:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=thingspeak
+#     ou:  java -jar target/ecosense-backend-0.1.0.jar --spring.profiles.active=thingspeak
+# Antes, defina a Read API Key do canal (aba "API Keys" no ThingSpeak) na variável de ambiente
+# THINGSPEAK_READ_API_KEY. Nunca coloque a chave neste arquivo.
+#
+# As listas abaixo SUBSTITUEM as do application.yml (os 10 dispositivos simulados).
+
+ecosense:
+  thingspeak:
+    simulate: false
+
+  devices:
+    - id: IOT-001
+      name: Sensor 01                 # ajuste o nome que aparece no painel
+      location: A definir             # ex.: Laboratório, Área Remota A
+      region: A definir               # agrupa as solicitações de manutenção
+      latitude: null                  # coordenadas para o mapa (opcional)
+      longitude: null
+      tx-interval: 1                  # minutos entre envios da placa (plano gratuito: mínimo 15 s)
+      type: Sensor
+      priority: Alta
+      harvesting-type: Solar          # tipo de coleta de energia (null se não coleta)
+      sun-hours: null
+      channel-id: 3574018             # canal "EcoSense - Sensor 01"
+      fields:
+        battery: field1               # Bateria (%)
+        consumption: field2           # Consumo (W)
+        temperature: field3           # Temperatura (°C)
+        harvested: field4             # Energia coletada (W)
+
+  # Sem baterias do sistema cadastradas: o armazenamento da visão geral usa a bateria dos dispositivos.
+  storage: []
