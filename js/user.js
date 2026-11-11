@@ -13,14 +13,13 @@ let prefs=loadPrefs();
 const updateWho=()=>{$('#who').textContent=prefs.name};
 
 /* ---------- alertas do usuário: respeitam as notificações e o limite de consumo ---------- */
-const readIds=new Set();
 let alertsBase=null;
 async function userAlerts(){
  if(!alertsBase)alertsBase=await api.getAlerts();
  const o=await api.getOverview();
  const list=alertsBase.filter(a=>a.lv==='cr'?prefs.critical:a.lv==='hi'?prefs.high:true);
  if(prefs.high&&o.con.now>prefs.limit)list.unshift({id:'limit',lv:'hi',ic:'🟠',t:'Consumo acima do seu limite',m:`Consumo atual de ${num(o.con.now)} W, acima do limite de ${num(prefs.limit)} W.`,w:'agora'});
- return list.map(a=>({...a,read:readIds.has(String(a.id))}));
+ return withRead(list);
 }
 function bindAlerts(redraw){
  V.onclick=async e=>{const b=e.target.closest('[data-read],[data-readall]');if(!b)return;
@@ -35,7 +34,7 @@ const needsAttention=(d,f)=>d.status==='Offline'||d.battery<20||(f.daysLeft!=nul
 const pages={
 async inicio(){
  const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje')]);
- const fById=Object.fromEntries(fc.items.map(f=>[f.id,f]));
+ const fById=byId(fc.items);
  const needs=devices.filter(d=>needsAttention(d,fById[d.id])),online=devices.filter(d=>d.status==='Online').length;
  const banner=needs.length
   ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção. <a href="#dispositivos">Ver meus dispositivos</a></div>`
@@ -53,13 +52,12 @@ async inicio(){
 
 async dispositivos(){
  const [devices,fc,reqs]=await Promise.all([api.getDevices(),api.getForecasts(),api.getMaintenanceRequests()]);
- const fById=Object.fromEntries(fc.items.map(f=>[f.id,f]));
+ const fById=byId(fc.items);
  let filter='all',openForm=null,notice='';
  const filterFns={all:()=>true,att:d=>needsAttention(d,fById[d.id]),on:d=>d.status==='Online',off:d=>d.status==='Offline'};
  const reqOf=id=>[...reqs].reverse().find(r=>r.deviceId===id&&r.status!=='Concluída');
  const card=d=>{
   const f=fById[d.id],r=reqOf(d.id),att=needsAttention(d,f);
-  const harvest=d.harvesting?`${num(d.harvesting.collected)} Wh <span class="mu">(${esc(d.harvesting.type)})</span>`:'<span class="mu">Sem coleta de energia</span>';
   const reason=d.status==='Offline'?'Dispositivo offline':'Bateria baixa';
   let action='';
   if(openForm===d.id)action=`<div class="mform">
@@ -68,18 +66,14 @@ async dispositivos(){
     <label class="mu" for="mnote">Observação (opcional)</label>
     <textarea id="mnote" rows="2" maxlength="200"></textarea>
     <div class="row" style="margin:0"><button class="btn on" data-act="send" data-id="${esc(d.id)}">Enviar solicitação</button><button class="btn" data-act="cancel" data-id="${esc(d.id)}">Cancelar</button></div></div>`;
-  else if(r){const statusClass={'Recebida':'s-Recebida','Agendada':'s-Agendada','Em rota':'s-Em-rota','Concluída':'s-Concluída'}[r.status]||'';const visit=r.scheduledFor?` · Visita em ${esc(r.scheduledFor.split('-').reverse().join('/'))}`:'';action=`<div class="mform"><div class="mu">Manutenção solicitada · ${esc(timeAgo(r.createdAt))} <span class="tag ${statusClass}">${esc(r.status)}</span>${visit}</div></div>`}
+  else if(r){const visit=r.scheduledFor?` · Visita em ${esc(formatDay(r.scheduledFor))}`:'';action=`<div class="mform"><div class="mu">Manutenção solicitada · ${esc(timeAgo(r.createdAt))} ${requestTag(r.status)}${visit}</div></div>`}
   else if(att)action=`<div class="mform"><button class="btn" data-act="open" data-id="${esc(d.id)}">Solicitar manutenção</button></div>`;
   return `<div class="card">
-   <h3>${esc(d.location)}</h3>
-   <div class="big" style="font-size:20px">${esc(d.name)}</div>
-   <div style="margin-top:6px">${tag(d.status)}</div>
-   ${bar(d.battery)}
-   <div class="mu">Bateria ${d.battery}% · Última comunicação ${esc(d.lastSeen)}</div>
+   ${deviceCardHead(d)}
    <dl class="kv">
     ${kvRow('Autonomia prevista',daysTag(f))}
     ${kvRow('Consumo',`${num(d.consumption)} Wh`)}
-    ${kvRow('Energia coletada',harvest)}
+    ${kvRow('Energia coletada',harvestText(d,'Sem coleta de energia'))}
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
    </dl>${action}</div>`};
  const draw=()=>{
@@ -103,66 +97,18 @@ async dispositivos(){
    draw()}};
  draw()},
 
-async previsao(){
- const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
- const fById=Object.fromEntries(fc.items.map(f=>[f.id,f]));
- const rank=r=>r.f.daysLeft!=null?r.f.daysLeft:r.f.sustainable?1000:2000;
- const rows=devices.map(d=>({d,f:fById[d.id]})).sort((a,b)=>rank(a)-rank(b));
- const online=rows.filter(r=>r.f.daysLeft!=null||r.f.sustainable);
- const atRisk=rows.filter(r=>r.f.daysLeft!=null&&r.f.daysLeft<=7);
- const first=rows.find(r=>r.f.daysLeft!=null);
- let sel=(first||online[0]||rows[0]).d.id,range='24h',drawToken=0;
- const tr=({d,f})=>`<tr><td>${esc(d.name)}</td><td>${daysTag(f)}</td><td>${f.confidence==null?'—':f.confidence+'%'}</td><td>${d.battery}%</td>
-  <td>${f.daysLeft!=null||f.sustainable?`<button class="btn" data-pick="${esc(d.id)}" aria-label="Ver gráficos de ${esc(d.name)}">Ver<span class="pvx"> gráficos</span></button>`:''}</td></tr>`;
- V.innerHTML=`<div class="grid">
-  <div class="card"><h3>Em risco (até 7 dias)</h3><div class="big">${atRisk.length}</div><div class="mu">de ${online.length} dispositivos com leitura</div></div>
-  <div class="card"><h3>Menor autonomia</h3><div class="big">${first?first.f.daysLeft:'—'} <small>${first?(first.f.daysLeft===1?'dia':'dias'):''}</small></div><div class="mu">${first?esc(first.d.name):'Nenhum dispositivo em esgotamento'}</div></div>
-  <div class="card"><h3>Sustentáveis</h3><div class="big">${rows.filter(r=>r.f.sustainable).length}</div><div class="mu">coletam mais do que consomem</div></div></div>
-  <div class="card" style="margin-bottom:16px"><h3>Quanto tempo cada bateria deve durar</h3><div class="tw"><table class="pvu">
-   <tr><th>Dispositivo</th><th>Autonomia</th><th><span class="pvx">Confiança</span><span class="pvm">Conf.</span></th><th>Bateria</th><th></th></tr>${rows.map(tr).join('')}</table></div>
-   <div class="mu" style="margin-top:10px">Estimativas atualizadas ${esc(fc.updatedAt)}.</div></div>
-  <div class="card" id="pcharts" style="margin-bottom:16px"><div class="row">
-   <select id="pdev" aria-label="Dispositivo">${online.map(r=>`<option value="${esc(r.d.id)}"${r.d.id===sel?' selected':''}>${esc(r.d.name)}</option>`).join('')}</select>
-   <span id="prange"></span></div>
-   <div class="mu" id="pinfo" style="margin-bottom:12px"></div>
-   <div class="grid g2" style="margin:0"><div><h3 class="mu" style="margin-bottom:8px">Consumo previsto × real (Wh)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
-   <div><h3 class="mu" style="margin-bottom:8px">Nível de bateria projetado (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
-   <div class="mu" style="margin-top:10px">A linha vertical marca o momento atual. Antes dela, dados medidos; depois, previsão.</div></div>`;
- const drawRange=()=>{const r=$('#prange');r.innerHTML='';const f=filters([['24h','Próximas 24 h'],['7d','Próximos 7 dias']],range,k=>{range=k;drawRange();drawCharts()});f.style.margin='0';r.append(f)};
- const drawCharts=async()=>{
-  const token=++drawToken;
-  const s=await api.getForecastSeries(sel,range);
-  if(token!==drawToken)return;
-  charts.forEach(c=>c.destroy());charts=[];
-  const r=rows.find(x=>x.d.id===sel);
-  $('#pinfo').innerHTML=`Autonomia: ${daysTag(r.f)}${r.f.confidence==null?'':` · confiança ${r.f.confidence}%`}`;
-  const line=(c,label,data,dash)=>({borderColor:css(c),label,data,fill:false,borderDash:dash||[]});
-  chart('c1','line',s.L,[line('--con','Real',s.consumo.real),line('--gen','Previsto',s.consumo.pred,[6,4])],{min:0},[nowLine(s.now)]);
-  chart('c2','line',s.L,[line('--con','Real',s.bateria.real),line('--cr','Projeção',s.bateria.pred,[6,4])],{min:0,max:100},[nowLine(s.now)])};
- $('#pdev').onchange=e=>{sel=e.target.value;drawCharts()};
- V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
- drawRange();drawCharts()},
+previsao:()=>renderForecast(),
 
 async energia(){
  const [s,b,l]=await Promise.all([api.getSources(),api.getBatteries(),api.getLoads()]);
- const top=[...l].sort((a,b)=>b.c-a.c).slice(0,3),mx=top.length?top[0].c:1;
  V.innerHTML=`<h2 class="sec">De onde vem a energia</h2>
-  <div class="grid">${s.map(x=>`<div class="card"><h3>${esc(x.n)}</h3><div class="big">${esc(x.e)}</div><div class="mu">Eficiência ${esc(x.ef)} · ${tag(x.st)}</div></div>`).join('')}</div>
+  <div class="grid">${s.map(x=>sourceCard(x)).join('')}</div>
   <h2 class="sec">Armazenamento</h2>
-  <div class="grid g2">${b.map(x=>`<div class="card"><h3>${esc(x.n)} · ${esc(x.tp)}</h3><div class="big">${x.pct}<small>% de ${esc(x.cap)}</small></div>
-   <div class="batt">${[...Array(10)].map((_,i)=>`<i style="${i<Math.round(x.pct/10)?'background:'+(x.st==='Carregando'?'var(--con)':col(x.pct)):''}"></i>`).join('')}</div>
-   ${tag(x.st)}${x.st==='Carregando'?' <span class="mu">⚡ recebendo carga</span>':''}</div>`).join('')}</div>
+  <div class="grid g2">${b.map(batteryCard).join('')}</div>
   <h2 class="sec">Maiores consumidores agora</h2>
-  <div class="card">${top.map(x=>`<div>${esc(x.n)} <span class="mu">${num(x.c)} W</span>${bar(x.c/mx*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'}</div>`},
+  <div class="card">${topConsumers(l)}</div>`},
 
-async historico(){
- const draw=async k=>{
-  charts.forEach(c=>c.destroy());charts=[];
-  const h=await api.getHistory(k);
-  V.innerHTML='';V.append(filters([['hoje','Hoje'],['7d','7 dias'],['30d','30 dias']],k,draw));
-  V.insertAdjacentHTML('beforeend',`<div class="grid g2"><div class="card"><h3>Energia gerada (${h.u})</h3><div class="chart"><canvas id="c1"></canvas></div></div><div class="card"><h3>Energia consumida (${h.u})</h3><div class="chart"><canvas id="c2"></canvas></div></div></div><div class="card"><h3>Bateria armazenada (%)</h3><div class="chart"><canvas id="c3"></canvas></div></div>`);
-  chart('c1','line',h.L,[lineDataset('--gen','Gerada',h.gen)]);chart('c2','line',h.L,[lineDataset('--con','Consumida',h.con)]);chart('c3','line',h.L,[lineDataset('--sto','Armazenada',h.sto)],{min:0,max:100})};
- draw('hoje')},
+historico:()=>renderHistory(),
 
 async alertas(){
  const draw=async()=>{
