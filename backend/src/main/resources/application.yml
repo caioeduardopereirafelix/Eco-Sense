@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: ecosense-backend
+  config:
+    # Lê segredos de um arquivo .env (formato CHAVE=valor), se existir. Procura em backend/.env
+    # e em .env na pasta de onde o back-end foi iniciado. O .env NÃO vai para o git (.gitignore).
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:backend/.env[.properties]
   jackson:
     serialization:
       write-dates-as-timestamps: false

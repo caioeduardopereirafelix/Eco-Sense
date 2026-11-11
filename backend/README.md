@@ -37,9 +37,18 @@ O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspea
 canal **3574018** ("EcoSense - Sensor 01": field1 bateria %, field2 consumo W, field3 temperatura °C,
 field4 energia coletada W) e desliga a simulação.
 
+**Onde colocar a Read API Key** (aba "API Keys" do canal → "Read API Keys") — escolha uma:
+
+- **Arquivo `backend/.env`** (recomendado): copie [`.env.example`](.env.example) para `.env` e preencha
+  `THINGSPEAK_READ_API_KEY=...`. O back-end lê esse arquivo ao iniciar (ou um `.env` na pasta de onde
+  ele foi iniciado) e o `.gitignore` impede que ele vá para o GitHub.
+- **Variável de ambiente** no IntelliJ (Run Configuration → Environment variables) ou no terminal.
+  Variáveis de ambiente têm prioridade sobre o `.env`.
+
+Ao iniciar, o log confirma: `Read API Key configurada (N caracteres)` ou `NÃO configurada`.
+
 ```powershell
-# Windows (PowerShell) — copie a Read API Key da aba "API Keys" do canal
-$env:THINGSPEAK_READ_API_KEY='SUA_READ_API_KEY'
+# Windows (PowerShell), com a chave no backend/.env
 .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=thingspeak"
 ```
 

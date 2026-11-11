@@ -40,6 +40,21 @@ public class ReadingService {
         this.client = client;
         this.props = props;
         this.clock = clock;
+        logStartup();
+    }
+
+    /** Diz no log de onde vêm os dados e se a Read API Key foi encontrada (sem mostrar a chave). */
+    private void logStartup() {
+        if (props.thingspeak().simulate()) {
+            log.info("Modo simulado: leituras geradas localmente para {} dispositivo(s); o ThingSpeak não é chamado.",
+                    props.devices().size());
+            return;
+        }
+        String key = props.thingspeak().readApiKey();
+        log.info("ThingSpeak: {} dispositivo(s). Read API Key {}.", props.devices().size(),
+                key == null || key.isBlank()
+                        ? "NÃO configurada (só funciona com canais públicos; defina THINGSPEAK_READ_API_KEY)"
+                        : "configurada (" + key.length() + " caracteres)");
     }
 
     /** latest = última entrada (null se o canal nunca transmitiu); hourly = médias por hora, em ordem. */
