@@ -62,8 +62,113 @@ ecosense:
         temperature: field6           # °C
         harvested: none
 
+    # ---------------------------------------------------------------------------------------------
+    # Sistemas solares com bateria (canais públicos). Onde o canal mede só CORRENTE, a potência é
+    # estimada como corrente × tensão nominal da bateria (o *-scale abaixo). As faixas de tensão → %
+    # são aproximações para o tipo de bateria inferido dos dados (LiFePO4 12 V: 12,0–13,6 V; Li-ion: 3,0–4,2 V).
+    # ---------------------------------------------------------------------------------------------
+
+    # Usina solar pequena com bateria 12 V. Fields: f1 tensão da bateria (V), f2 corrente de carga
+    # solar (A), f3 corrente das cargas (A), f4 temperatura (°C), f5 chuva, f6 UV.
+    - id: IOT-003
+      name: Usina solar 12 V
+      location: Elektrownia solarna
+      region: Polônia
+      latitude: 49.625
+      longitude: 20.695556
+      tx-interval: 1
+      type: Sistema solar
+      priority: Alta
+      harvesting-type: Solar
+      channel-id: 1279978
+      history-chunk-days: 5           # envia a cada ~60 s: 8000 entradas ≈ 5,5 dias
+      fields: { battery: field1, consumption: field3, temperature: field4, harvested: field2 }
+      conversion:
+        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-max: 13.6
+        consumption-scale: 12.8       # A × 12,8 V ≈ W
+        harvested-scale: 12.8
+
+    # Estação meteorológica solar (ESP8266 + INA219). Fields: f2 bateria (V), f3 temperatura (°C),
+    # f6 tensão do painel (V), f7 luminosidade (lx), f8 corrente da bateria (mA; positivo = descarga).
+    - id: IOT-004
+      name: Estação solar Yokohama
+      location: Solar Weather Station (Outside2-17)
+      region: Japão
+      latitude: 35.337296
+      longitude: 139.624439
+      tx-interval: 5
+      type: Sensor
+      priority: Média
+      harvesting-type: Solar
+      channel-id: 181889
+      history-chunk-days: 27          # envia a cada ~5 min: 8000 entradas ≈ 27 dias
+      fields: { battery: field2, consumption: field8, temperature: field3, harvested: field8 }
+      conversion:
+        battery-voltage-min: 3.0      # Li-ion (estimativa)
+        battery-voltage-max: 4.2
+        consumption-scale: 0.0038     # mA × 3,8 V / 1000 ≈ W (corrente positiva = descarga = consumo)
+        harvested-scale: -0.0038      # corrente negativa = carga vinda do painel
+
+    # Casa com 14,52 kWp de painéis solares e bateria. Fields: f2 carga da bateria (%), f3 potência da
+    # bateria (W), f4 produção solar (W), f7 consumo da casa (W); f1/f5 wallbox, f6 rede, f8 total.
+    - id: IOT-005
+      name: Casa solar 14,5 kWp
+      location: PV-Anlage EFH Merlischachen
+      region: Suíça
+      latitude: 47.065859
+      longitude: 8.406011
+      tx-interval: 1
+      type: Residência
+      priority: Alta
+      harvesting-type: Solar
+      channel-id: 107067
+      history-chunk-days: 2           # envia a cada ~30 s
+      fields: { battery: field2, consumption: field7, temperature: none, harvested: field4 }
+
+    # Banco de baterias com dois controladores solares. Fields: f1 corrente de descarga (A),
+    # f2 tensão (V), f3/f4 corrente dos controladores 1 e 2 (A). Só o controlador 1 entra na coleta.
+    - id: IOT-006
+      name: Banco solar Texas
+      location: Solar Array
+      region: EUA
+      latitude: 32.4421
+      longitude: -97.7942
+      tx-interval: 1
+      type: Sistema solar
+      priority: Média
+      harvesting-type: Solar
+      channel-id: 432856
+      history-chunk-days: 5
+      fields: { battery: field2, consumption: field1, temperature: none, harvested: field3 }
+      conversion:
+        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-max: 13.6
+        consumption-scale: 13.2       # A × 13,2 V ≈ W
+        harvested-scale: 13.2
+
+    # Fonte de energia solar com bateria. Fields: f1 temperatura do gabinete (°C), f2 tensão da
+    # bateria (V), f3 corrente da bateria (A; negativo = descarga, positivo = carga), f4 ventoinha.
+    - id: IOT-007
+      name: Estação de energia Nebraska
+      location: PowerStationData
+      region: EUA
+      latitude: 42.56
+      longitude: -100.8
+      tx-interval: 15
+      type: Sistema solar
+      priority: Baixa
+      harvesting-type: Solar
+      channel-id: 285868
+      fields: { battery: field2, consumption: field3, temperature: field1, harvested: field3 }
+      conversion:
+        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-max: 13.6
+        consumption-scale: -13.2      # descarga (negativa) × 13,2 V → consumo em W
+        harvested-scale: 13.2         # carga (positiva) × 13,2 V → coleta em W
+
     # Para incluir o seu próprio canal (3574018, "EcoSense - Sensor 01"), descomente:
-    # - id: IOT-003
+    # - id: IOT-008
     #   name: Sensor 01
     #   location: A definir
     #   region: A definir

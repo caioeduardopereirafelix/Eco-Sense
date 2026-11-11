@@ -40,9 +40,23 @@ lê **canais públicos** do ThingSpeak com dados reais e ativos (não precisam d
 |---|---|---|---|
 | Dispositivo IOT-001 | [2988514](https://thingspeak.mathworks.com/channels/2988514) "[Harveo] Indoor tests @ INA3221" | Projeto EMBEDO Harveo — coletor de energia com mini painel solar indoor, Gdańsk (PL) | bateria (V → %), potência da bateria (mW → consumo W), potência do painel (mW → coleta W) |
 | Dispositivo IOT-002 | [3124603](https://thingspeak.mathworks.com/channels/3124603) "EMBEDO Node" | Mesmo laboratório | carga do UPS (%), temperatura (°C) |
+| Dispositivo IOT-003 | [1279978](https://thingspeak.mathworks.com/channels/1279978) "Elektrownia solarna" | Usina solar pequena com bateria 12 V, Polônia | bateria (V → %), corrente das cargas e de carga solar (A → W, × 12,8 V), temperatura |
+| Dispositivo IOT-004 | [181889](https://thingspeak.mathworks.com/channels/181889) "Solar Weather Station (Outside2-17)" | Estação meteorológica solar (ESP8266 + INA219), Yokohama (JP) | bateria (V → %), corrente da bateria (mA → W, × 3,8 V; + descarga, − carga), temperatura |
+| Dispositivo IOT-005 | [107067](https://thingspeak.mathworks.com/channels/107067) "PV-Anlage EFH Merlischachen" | Casa com 14,52 kWp de painéis e bateria, Suíça | carga da bateria (%), consumo da casa (W), produção solar (W) |
+| Dispositivo IOT-006 | [432856](https://thingspeak.mathworks.com/channels/432856) "Solar Array" | Banco de baterias com 2 controladores solares, Texas (EUA) | bateria (V → %), descarga (A → W, × 13,2 V), controlador 1 (A → W) |
+| Dispositivo IOT-007 | [285868](https://thingspeak.mathworks.com/channels/285868) "PowerStationData" | Fonte de energia solar com bateria, Nebraska (EUA) | bateria (V → %), corrente da bateria (A → W; − descarga, + carga), temperatura do gabinete |
 | Armazenamento | [1276112](https://thingspeak.mathworks.com/channels/1276112) "Solarakku" | Banco de baterias solar LiFePO4 24 V / 320 Ah (~8 kWh), Hoyerswerda (DE) | tensão da célula 1 (V → %) |
 
-Os dados são de terceiros: **cite os canais como fonte** no trabalho acadêmico.
+Os dados são de terceiros: **cite os canais como fonte** no trabalho acadêmico. Se um canal parar de
+transmitir, o dispositivo aparece Offline e gera alerta; nada quebra.
+
+**Aproximações a citar:** onde o canal mede só corrente, a potência é corrente × tensão nominal da
+bateria; a carga (%) vem da tensão por uma faixa linear típica do tipo de bateria inferido dos dados
+(Li-ion 3,0–4,2 V; LiFePO4 12 V 12,0–13,6 V). Os sistemas misturam escalas de mW (Harveo, Yokohama) a
+kW (casa na Suíça), então os totais da visão geral são dominados pelos sistemas grandes.
+
+O mapa da Manutenção usa tiles do **OpenStreetMap**, que exigem que o front seja aberto por um servidor
+local (Live Server etc.), não como arquivo.
 
 O Harveo trabalha com **miliwatts** (painel ~0,7 mW de dia, consumo ~0,1 mW), escala típica de
 *energy harvesting*. Por isso a API devolve potência e energia com 4 algarismos significativos (sem

@@ -85,7 +85,7 @@ async manutencao(){
     <h2 class="sec">Mapa de dispositivos por risco</h2>
     <div id="maintenance-map" class="maintenance-map" role="img" aria-label="Mapa dos dispositivos coloridos conforme o risco"></div>
     <div class="map-legend"><span class="map-key"><i style="background:var(--cr)"></i>Crítico</span><span class="map-key"><i style="background:var(--wn)"></i>Atenção</span><span class="map-key"><i style="background:var(--ok)"></i>Baixo</span></div>
-    <p id="map-note" class="mu" style="margin-top:8px">Coordenadas demonstrativas no entorno de Brasília; atualize com latitude e longitude reais.</p>
+    <p id="map-note" class="mu" style="margin-top:8px">Cada ponto fica na latitude e longitude cadastradas do dispositivo.</p>
    </div>
    <h2 class="sec">Solicitações por região</h2>
    <div id="maintenance-filters"></div>
@@ -97,9 +97,12 @@ async manutencao(){
   if(typeof window.L==='undefined'||typeof window.L.map!=='function'){mapNote.textContent='O mapa não foi carregado. Verifique a conexão para acessar o serviço de mapas.'}
   else{
    const dark=document.documentElement.dataset.theme==='dark';
-   map=window.L.map('maintenance-map',{minZoom:3,maxZoom:18,zoomControl:true,worldCopyJump:false,maxBoundsViscosity:1});
-   /* CARTO em vez do servidor da OSM: a OSM bloqueia tiles quando a página é aberta como arquivo (sem Referer) */
-   const tileLayer=window.L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark?'dark_all':'light_all'}/{z}/{x}/{y}{r}.png`,{subdomains:'abcd',maxZoom:18,attribution:'&copy; OpenStreetMap &copy; CARTO',errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}).addTo(map);
+   map=window.L.map('maintenance-map',{minZoom:1,maxZoom:18,zoomControl:true,worldCopyJump:false,maxBoundsViscosity:1});
+   /* Tiles do OpenStreetMap (a CARTO passou a exigir chave de API). A OSM exige Referer, então abra o
+      front por um servidor local (Live Server etc.), não como arquivo. No tema escuro, um filtro CSS
+      (.map-dark em style.css) escurece os tiles. */
+   $('#maintenance-map').classList.toggle('map-dark',dark);
+   const tileLayer=window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}).addTo(map);
    let tileErrors=0;
    tileLayer.on('tileerror',()=>{if(++tileErrors===3)mapNote.textContent='Não foi possível carregar o mapa base. Verifique a conexão com o serviço de mapas; os pontos continuam visíveis.'});
    /* mantém o tamanho do mapa em dia: sem isso, ao arrastar aparecem faixas em branco */
