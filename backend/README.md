@@ -47,8 +47,17 @@ lê **canais públicos** do ThingSpeak com dados reais e ativos (não precisam d
 | Dispositivo IOT-007 | [285868](https://thingspeak.mathworks.com/channels/285868) "PowerStationData" | Fonte de energia solar com bateria, Nebraska (EUA) | bateria (V → %), corrente da bateria (A → W; − descarga, + carga), temperatura do gabinete |
 | Armazenamento | [1276112](https://thingspeak.mathworks.com/channels/1276112) "Solarakku" | Banco de baterias solar LiFePO4 24 V / 320 Ah (~8 kWh), Hoyerswerda (DE) | tensão da célula 1 (V → %) |
 
-Os dados são de terceiros: **cite os canais como fonte** no trabalho acadêmico. Se um canal parar de
-transmitir, o dispositivo aparece Offline e gera alerta; nada quebra.
+**Exemplos offline** — canais públicos que pararam de transmitir, incluídos de propósito para mostrar o
+comportamento do sistema (status Offline, "última comunicação há N meses/anos", alerta, sem previsão):
+
+| No EcoSense | Canal | Origem | Parou em |
+|---|---|---|---|
+| Dispositivo IOT-008 | [3124605](https://thingspeak.mathworks.com/channels/3124605) "[Harveo][DFRobot] Indoor tests" | Coletor DFRobot SPV1050 do experimento comparativo EMBEDO, Gdańsk (PL) | 07/2026 |
+| Dispositivo IOT-009 | [1085833](https://thingspeak.mathworks.com/channels/1085833) "Volta" | Bateria e painel de estação meteorológica, Itália | 03/2021 (bateria em 10,8 V) |
+| Dispositivo IOT-010 | [33748](https://thingspeak.mathworks.com/channels/33748) "SolarWiFiRepeater" | Repetidor Wi-Fi solar, Nova Zelândia | 07/2017 (bateria em 10,7 V) |
+
+Os dados são de terceiros: **cite os canais como fonte** no trabalho acadêmico. Se um canal ativo parar
+de transmitir, ele passa a se comportar como esses exemplos; nada quebra.
 
 **Aproximações a citar:** onde o canal mede só corrente, a potência é corrente × tensão nominal da
 bateria; a carga (%) vem da tensão por uma faixa linear típica do tipo de bateria inferido dos dados

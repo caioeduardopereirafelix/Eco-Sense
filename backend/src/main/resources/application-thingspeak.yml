@@ -167,8 +167,76 @@ ecosense:
         consumption-scale: -13.2      # descarga (negativa) × 13,2 V → consumo em W
         harvested-scale: 13.2         # carga (positiva) × 13,2 V → coleta em W
 
+    # ---------------------------------------------------------------------------------------------
+    # Exemplos OFFLINE: canais públicos que pararam de transmitir. Mostram como o EcoSense reage:
+    # status Offline, última comunicação antiga, alerta "Dispositivo offline", sem previsão nem
+    # histórico recente. A bateria exibida é a da última leitura recebida.
+    # ---------------------------------------------------------------------------------------------
+
+    # Coletor DFRobot SPV1050 do experimento comparativo do laboratório EMBEDO (parou em 07/2026).
+    # Fields: f1 tensão da bateria DFRobot (V), f2 potência da bateria (mW), f3 tensão do painel (V),
+    # f4 potência do painel (mW); f5–f8 = mesmas leituras do Harveo.
+    - id: IOT-008
+      name: DFRobot SPV1050 – coletor solar
+      location: Laboratório EMBEDO (indoor)
+      region: Gdańsk
+      latitude: 54.424526
+      longitude: 18.478837
+      tx-interval: 1
+      type: Sensor
+      priority: Baixa
+      harvesting-type: Solar
+      channel-id: 3124605
+      fields: { battery: field1, consumption: field2, temperature: none, harvested: field4 }
+      conversion:
+        battery-voltage-min: 3.0      # Li-ion
+        battery-voltage-max: 4.2
+        consumption-scale: -0.001     # mW → W, descarga (negativa) = consumo
+        harvested-scale: 0.001
+
+    # Bateria + painel de uma estação meteorológica em Raspberry Pi (parou em 03/2021, bateria descarregada).
+    # Fields: f1 tensão da bateria (V), f2 tensão do painel (V), f3 temperatura da CPU, f4 corrente de carga (mA),
+    # f5 temperatura (°C), f6 corrente do painel (mA), f7 tensão da carga (V), f8 corrente da carga (mA, negativa).
+    - id: IOT-009
+      name: Estação meteorológica Volta
+      location: Volta
+      region: Itália
+      latitude: 46.367166
+      longitude: 11.898007
+      tx-interval: 5
+      type: Sensor
+      priority: Média
+      harvesting-type: Solar
+      channel-id: 1085833
+      fields: { battery: field1, consumption: field8, temperature: field5, harvested: field6 }
+      conversion:
+        battery-voltage-min: 11.6     # chumbo-ácido 12 V (estimativa)
+        battery-voltage-max: 12.9
+        consumption-scale: -0.0108    # mA × 10,8 V / 1000 ≈ W (corrente da carga é negativa)
+        harvested-scale: 0.0108
+
+    # Repetidor Wi-Fi alimentado por energia solar (parou em 07/2017, bateria baixa).
+    # Fields: f1 tensão da bateria (V), f2 corrente da bateria (A, negativa = descarga).
+    - id: IOT-010
+      name: Repetidor Wi-Fi solar
+      location: SolarWiFiRepeater
+      region: Nova Zelândia
+      latitude: -39.276366
+      longitude: 173.921337
+      tx-interval: 15
+      type: Comunicação
+      priority: Média
+      harvesting-type: Solar
+      channel-id: 33748
+      fields: { battery: field1, consumption: field2, temperature: none, harvested: field2 }
+      conversion:
+        battery-voltage-min: 11.6     # chumbo-ácido 12 V (estimativa)
+        battery-voltage-max: 12.9
+        consumption-scale: -12        # descarga (negativa) × 12 V → W
+        harvested-scale: 12           # carga (positiva) × 12 V → W
+
     # Para incluir o seu próprio canal (3574018, "EcoSense - Sensor 01"), descomente:
-    # - id: IOT-008
+    # - id: IOT-011
     #   name: Sensor 01
     #   location: A definir
     #   region: A definir
