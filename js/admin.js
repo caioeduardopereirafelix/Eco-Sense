@@ -297,7 +297,7 @@ async alertas(){const a=await api.getAlerts();
 async configuracoes(){V.innerHTML=`<div class="card" style="max-width:640px">
  <div class="set"><div><b>Perfil de consumo</b><div class="mu">Define como as cargas são priorizadas</div></div><select><option>Equilibrado</option><option>Econômico</option><option>Desempenho</option></select></div>
  <div class="set"><div><b>Limite de consumo</b><div class="mu">Alerta acima de <span id="lim">300</span> W</div></div><input type="range" min="100" max="600" value="300" oninput="lim.textContent=this.value"></div>
- ${[['Modo economia automático',1],['Alertas de bateria crítica',1],['Alertas de consumo elevado',1],['Alertas por e-mail',0]].map(([n,o])=>`<div class="set"><b>${n}</b><button class="sw${o?' on':''}" aria-label="${n}" onclick="this.classList.toggle('on')"></button></div>`).join('')}
+ ${[['Alertas de bateria crítica',1],['Alertas de consumo elevado',1],['Alertas por e-mail',0]].map(([n,o])=>`<div class="set"><b>${n}</b><button class="sw${o?' on':''}" aria-label="${n}" onclick="this.classList.toggle('on')"></button></div>`).join('')}
  <div class="set"><div><b>Sistema</b><div class="mu">Atualização dos dados</div></div><select><option>A cada 1 min</option><option>A cada 5 min</option></select></div></div>`}
 };
 const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['configuracoes','Configurações']];
