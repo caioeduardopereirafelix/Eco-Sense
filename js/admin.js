@@ -20,10 +20,8 @@ async geracao(){const s=await api.getSources(),h=await api.getHistory('7d');
  <div class="card"><h3>Geração ao longo da semana (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>`;
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Total gerado',historyEnergy(h).gen)])},
 async consumo(){const l=await api.getLoads();
- V.innerHTML=`<div class="row"><button class="btn${eco?' on':''}" id="eco">${eco?'Modo Economia ativo':'Ativar Modo Economia'}</button></div>${eco?'<div class="banner">Modo Economia ativo: cargas de baixa prioridade reduzidas (simulação visual).</div>':''}
- <div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
- ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>{const c=eco&&p==='Baixa'&&x.currentW!=null?x.currentW*.5:x.currentW;return`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(c)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`}).join('')}</table></div></div>`).join('')}`;
- $('#eco').onclick=()=>{eco=!eco;pages.consumo()}},
+ V.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
+ ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(x.currentW)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`).join('')}</table></div></div>`).join('')}`},
 async armazenamento(){const b=await api.getBatteries();
  V.innerHTML=`<div class="grid g2">${b.map(batteryCard).join('')}</div>`},
 async manutencao(){
@@ -302,6 +300,5 @@ async configuracoes(){V.innerHTML=`<div class="card" style="max-width:640px">
  ${[['Modo economia automático',1],['Alertas de bateria crítica',1],['Alertas de consumo elevado',1],['Alertas por e-mail',0]].map(([n,o])=>`<div class="set"><b>${n}</b><button class="sw${o?' on':''}" aria-label="${n}" onclick="this.classList.toggle('on')"></button></div>`).join('')}
  <div class="set"><div><b>Sistema</b><div class="mu">Atualização dos dados</div></div><select><option>A cada 1 min</option><option>A cada 5 min</option></select></div></div>`}
 };
-let eco=false;
 const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['configuracoes','Configurações']];
 startApp(NAV,pages,{staticPages:['configuracoes']});
