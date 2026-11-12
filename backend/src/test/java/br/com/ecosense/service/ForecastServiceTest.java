@@ -24,8 +24,8 @@ class ForecastServiceTest {
     void tendenciaLinearDaBateria() {
         Instant now = Instant.parse("2026-11-10T12:00:00Z");
         List<Reading> rs = new ArrayList<>();
-        for (int h = 72; h >= 0; h--) {
-            /* cai 4 pontos por dia, terminando em 10% */
+        for (int h = ForecastService.TREND_HOURS; h >= 0; h--) {
+            /* cai 4 pontos por dia ao longo da janela de 7 dias, terminando em 10% */
             rs.add(new Reading(now.minusSeconds(h * 3600L), 10 + 4 * h / 24.0, null, null, null));
         }
         Stats.Trend t = Stats.trend(rs, now, Reading::battery, 12);

@@ -150,7 +150,8 @@ test-sim:
     1000007: { battery: 3, trend-per-day: -5, consumption-w: 4, harvested-w: 0.5, temperature: 26, offline-minutes: 180 }
     1000008: { battery: 18, trend-per-day: -3, consumption-w: 0.25, harvested-w: 0.12, temperature: 21 }
     1000009: { battery: 2, trend-per-day: -2, consumption-w: 0.25, harvested-w: 0.05, temperature: 20, offline-minutes: 1440 }
-    1000010: { battery: 66, trend-per-day: 0.1, consumption-w: 0.58, harvested-w: 0.62, temperature: 17 }
+    # 1000010: bateria subindo, mas coleta < consumo → saldo negativo (deficit)
+    1000010: { battery: 66, trend-per-day: 0.5, consumption-w: 0.58, harvested-w: 0.4, temperature: 17 }
     2000001: { battery: 82 }
     2000002: { battery: 34 }
     2000003: { battery: 12 }

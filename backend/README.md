@@ -137,7 +137,7 @@ do ThingSpeak para 10 dispositivos de teste.
 | Online/Offline | Online se a última entrada for mais recente que `offline-after` (30 min) ou 3× o `tx-interval`, o que for maior. |
 | Consumo e coleta (Wh/dia) | Média de potência das últimas 24 h × 24. |
 | Energia (kWh) | Cada média horária (W) × 1 h, somadas no período. |
-| Previsão de autonomia | Tendência linear da bateria nas últimas 72 h. Queda → dias até zerar; estável/subindo → sustentável. A confiança cai com ruído e falta de dados. |
+| Previsão de autonomia | Tendência linear da bateria nos últimos 7 dias + saldo energético (coleta − consumo) no mesmo período. Queda → dias até zerar; estável/subindo com saldo ≥ 0 → sustentável; estável/subindo com saldo < 0 → "saldo negativo" (sem número de dias, pois a capacidade em Wh não é conhecida). A confiança cai com oscilação da bateria, falta de dados e quando bateria e saldo se contradizem. |
 | Alertas | Offline, bateria < 20 %, esgotando em ≤ 3 dias, consumo > 1,5× a média de 7 dias, geração < 70 % da de ontem. |
 | Cadastro de dispositivos | Banco (tabela `devices`), com cópia em memória recarregada a cada alteração. |
 | Manutenção | Banco (tabela `maintenance_requests`). |

@@ -87,10 +87,10 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
 async function renderForecast({detailed=false}={}){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
- /* ordem: menor autonomia primeiro, depois sustentáveis, depois sem leitura */
- const rank=r=>r.f.daysLeft!=null?r.f.daysLeft:r.f.sustainable?1000:2000;
+ /* ordem: menor autonomia primeiro, depois saldo negativo, sustentáveis e sem leitura */
+ const rank=r=>r.f.daysLeft!=null?r.f.daysLeft:r.f.deficit?900:r.f.sustainable?1000:2000;
  const rows=devices.map(d=>({d,f:fById[d.id]})).sort((a,b)=>rank(a)-rank(b));
- const withReading=rows.filter(r=>r.f.daysLeft!=null||r.f.sustainable);
+ const withReading=rows.filter(r=>hasForecast(r.f));
  const atRisk=rows.filter(r=>r.f.daysLeft!=null&&r.f.daysLeft<=7);
  const first=rows.find(r=>r.f.daysLeft!=null);
  const suns=rows.map(r=>r.f.sunHours).filter(h=>h!=null);
@@ -101,12 +101,12 @@ async function renderForecast({detailed=false}={}){
   <td>${esc(d.name)}${idSuffix(d)}</td>${detailed?`<td>${esc(d.location||'—')}</td>`:''}
   <td>${daysTag(f)}</td><td>${f.confidence==null?'—':f.confidence+'%'}</td>
   ${detailed?`<td>${f.sunHours==null?'—':num(f.sunHours)+' h/dia'}</td>`:''}<td>${num(d.battery)}%</td>
-  <td>${f.daysLeft!=null||f.sustainable?`<button class="btn" data-pick="${esc(d.id)}" aria-label="Ver gráficos de ${esc(d.name)}">Ver<span class="pvx"> gráficos</span></button>`:''}</td></tr>`;
+  <td>${hasForecast(f)?`<button class="btn" data-pick="${esc(d.id)}" aria-label="Ver gráficos de ${esc(d.name)}">Ver<span class="pvx"> gráficos</span></button>`:''}</td></tr>`;
  const head=`<tr><th>Dispositivo</th>${detailed?'<th>Local</th>':''}<th>Autonomia</th><th><span class="pvx">Confiança</span><span class="pvm">Conf.</span></th>${detailed?'<th>Exposição solar</th>':''}<th>Bateria</th><th></th></tr>`;
  V.innerHTML=`<div class="grid">
   <div class="card"><h3>Em risco (até 7 dias)</h3><div class="big">${atRisk.length}</div><div class="mu">de ${withReading.length} dispositivos com leitura</div></div>
   <div class="card"><h3>Menor autonomia</h3><div class="big">${first?first.f.daysLeft:'—'} <small>${first?(first.f.daysLeft===1?'dia':'dias'):''}</small></div><div class="mu">${first?esc(first.d.name):'Nenhum dispositivo em esgotamento'}</div></div>
-  <div class="card"><h3>Sustentáveis</h3><div class="big">${rows.filter(r=>r.f.sustainable).length}</div><div class="mu">coletam mais do que consomem</div></div>
+  <div class="card"><h3>Sustentáveis</h3><div class="big">${rows.filter(r=>r.f.sustainable).length}</div><div class="mu">coletam mais do que consomem${rows.some(r=>r.f.deficit)?` · ${rows.filter(r=>r.f.deficit).length} com saldo negativo`:''}</div></div>
   ${detailed?`<div class="card"><h3>Contexto da previsão</h3><div class="big" style="font-size:22px">${esc(fc.season)}</div><div class="mu">Exposição solar média ${avgSun} h/dia · atualizado ${esc(timeAgo(fc.updatedAt))}</div></div>`:''}</div>
   <div class="card" style="margin-bottom:16px"><h3>${detailed?'Autonomia estimada por dispositivo':'Quanto tempo cada bateria deve durar'}</h3>
    <div class="tw"><table class="${detailed?'pv':'pvu'}">${head}${rows.map(tr).join('')}</table></div>
@@ -120,7 +120,8 @@ async function renderForecast({detailed=false}={}){
    <div class="mu" style="margin-top:10px">A linha tracejada vertical marca o momento atual. Antes dela, dados medidos; depois, previsão.</div></div>`;
  const info=({f})=>{
   const parts=[`Autonomia: ${daysTag(f)}`];
-  if(f.confidence!=null)parts.push(`confiança ${f.confidence}%`);
+  if(f.confidence!=null)parts.push(`confiança ${f.confidence}%${f.confidence<60?' (baixa: bateria oscila muito ou contradiz o saldo)':''}`);
+  if(f.balanceWhDay!=null)parts.push(`saldo coleta − consumo: ${balanceText(f.balanceWhDay)} (7 dias)`);
   if(detailed)parts.push(f.sunHours==null?'sem geração solar':`exposição solar ${num(f.sunHours)} h/dia`,`estação: ${esc(fc.season)}`);
   return parts.join(' · ')};
  const drawRange=()=>{const r=$('#prange');r.innerHTML='';const f=filters([['24h','Próximas 24 h'],['7d','Próximos 7 dias']],range,k=>{range=k;drawRange();drawCharts()});f.style.margin='0';r.append(f)};

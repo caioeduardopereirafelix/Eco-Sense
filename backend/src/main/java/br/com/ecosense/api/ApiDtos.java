@@ -44,7 +44,12 @@ public final class ApiDtos {
     public record Alert(String id, String level, String title, String message, Instant createdAt) {}
 
     public record Forecasts(String season, Instant updatedAt, List<ForecastItem> items) {}
-    public record ForecastItem(String id, Integer daysLeft, boolean sustainable, Integer confidence, Double sunHours) {}
+    /**
+     * daysLeft: dias até esgotar (bateria caindo). sustainable: bateria estável/subindo e saldo não negativo.
+     * deficit: bateria estável/subindo, mas consome mais do que coleta. balanceWhDay: coleta − consumo (Wh/dia).
+     */
+    public record ForecastItem(String id, Integer daysLeft, boolean sustainable, boolean deficit,
+                               Double balanceWhDay, Integer confidence, Double sunHours) {}
 
     public record ForecastSeries(String step, List<Instant> timestamps, int nowIndex, Series consumption, Series battery) {}
     public record Series(List<Double> measured, List<Double> predicted) {}

@@ -31,10 +31,17 @@ function energyScale(...seriesWh){
 /* rótulo do eixo X a partir de um timestamp: passo 'hour' → "14h"; 'day' → "05/11" */
 const timeLabel=(iso,step)=>{const d=new Date(iso);
  return step==='hour'?`${d.getHours()}h`:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`};
-/* Tag de autonomia: dias restantes (crítico ≤3, atenção ≤7), "Sustentável" ou "Sem leitura" */
+/* Tag de autonomia: dias restantes (crítico ≤3, atenção ≤7), "Sustentável", "Saldo negativo"
+   (bateria ainda estável, mas consome mais do que coleta) ou "Sem leitura" */
 const daysTag=f=>f.daysLeft!=null
  ?`<span class="tag s-${f.daysLeft<=3?'Crítico':f.daysLeft<=7?'Atenção':'Normal'}">${f.daysLeft} ${f.daysLeft===1?'dia':'dias'}</span>`
- :f.sustainable?'<span class="tag s-Normal">Sustentável</span>':'<span class="tag s-Baixa">Sem leitura</span>';
+ :f.sustainable?'<span class="tag s-Normal">Sustentável</span>'
+ :f.deficit?'<span class="tag s-Atenção" title="A bateria não está caindo, mas o consumo supera a coleta">Saldo negativo</span>'
+ :'<span class="tag s-Baixa">Sem leitura</span>';
+/* tem previsão (dias, sustentável ou saldo negativo) */
+const hasForecast=f=>f.daysLeft!=null||f.sustainable||f.deficit;
+/* saldo energético coleta − consumo: "+1,2 Wh/dia" / "−730 Wh/dia" */
+const balanceText=wh=>wh==null?null:`${wh>0?'+':wh<0?'−':''}${energy(Math.abs(wh))}/dia`;
 /* Linha vertical tracejada marcando "agora" nos gráficos de previsão */
 const nowLine=i=>({id:'nowLine',afterDatasetsDraw(c){const x=c.scales.x.getPixelForValue(i),{top,bottom}=c.chartArea,g=c.ctx;g.save();g.strokeStyle=css('--mu');g.setLineDash([3,3]);g.beginPath();g.moveTo(x,top);g.lineTo(x,bottom);g.stroke();g.setLineDash([]);g.fillStyle=css('--mu');g.font='12px IBM Plex Sans,system-ui,sans-serif';g.fillText('agora',x+5,top+13);g.restore()}});
 const col=p=>p<20?'var(--cr)':p<45?'var(--wn)':'var(--ok)';

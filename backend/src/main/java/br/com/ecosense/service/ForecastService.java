@@ -25,18 +25,29 @@ import br.com.ecosense.service.ReadingService.DeviceData;
 
 /**
  * Previsão de autonomia da bateria.
- * Modelo simples e explicável: tendência linear da bateria nas últimas {@value #TREND_HOURS} h.
- * Queda por dia → dias até zerar; estável ou subindo → sustentável. A confiança cai quanto mais
- * os pontos fogem da reta e quanto menos pontos houver. Pode ser trocado por um modelo melhor
- * sem mudar o contrato da API.
+ * Modelo simples e explicável, em duas partes:
+ * <ol>
+ *   <li>Tendência linear da bateria nas últimas {@value #TREND_HOURS} h (7 dias, para diluir o ciclo
+ *       dia/noite e a sorte de um dia ensolarado). Queda por dia → dias até zerar.</li>
+ *   <li>Saldo energético no mesmo período (coleta − consumo, quando o canal mede os dois). Bateria
+ *       estável ou subindo só conta como sustentável se o saldo não for negativo; senão o
+ *       dispositivo fica com saldo negativo (deficit), sem número de dias, pois a capacidade da
+ *       bateria em Wh não é conhecida.</li>
+ * </ol>
+ * A confiança cai quanto mais os pontos fogem da reta, quanto menos pontos houver e quando a
+ * tendência e o saldo apontam em direções opostas. Pode ser trocado por um modelo melhor sem
+ * mudar o contrato da API.
  */
 @Service
 public class ForecastService {
 
-    static final int TREND_HOURS = 72;
+    static final int TREND_HOURS = 7 * 24;
     static final int MIN_POINTS = 12;
     /** queda menor que isso (pontos % por dia) conta como estável */
     static final double SUSTAINABLE_SLOPE = -0.05;
+    static final int MIN_CONFIDENCE = 40;
+    /** desconto na confiança quando bateria e saldo energético discordam */
+    static final int DISAGREEMENT_PENALTY = 20;
 
     private final ReadingService readings;
     private final DeviceService devices;
@@ -61,14 +72,20 @@ public class ForecastService {
         Stats.Trend trend = trend(data);
         Double battery = data.latest() == null ? null : data.latest().battery();
         if (!devices.isOnline(d, data) || trend == null || battery == null) {
-            return new ForecastItem(d.id(), null, false, null, d.sunHours());
+            return new ForecastItem(d.id(), null, false, false, null, null, d.sunHours());
         }
-        int confidence = confidence(trend);
-        if (trend.slopePerDay() >= SUSTAINABLE_SLOPE) {
-            return new ForecastItem(d.id(), null, true, confidence, d.sunHours());
+        Double balance = balanceWhDay(d, data);
+        boolean falling = trend.slopePerDay() < SUSTAINABLE_SLOPE;
+        boolean negativeBalance = balance != null && balance < 0;
+        /* bateria subindo com saldo negativo (ou caindo com saldo positivo): sinais contraditórios */
+        boolean disagree = balance != null && falling != negativeBalance;
+        int confidence = Math.max(MIN_CONFIDENCE, confidence(trend) - (disagree ? DISAGREEMENT_PENALTY : 0));
+        Double balanceOut = balance == null ? null : Stats.sig(balance);
+        if (falling) {
+            int daysLeft = (int) Math.max(1, Math.ceil(battery / -trend.slopePerDay()));
+            return new ForecastItem(d.id(), daysLeft, false, false, balanceOut, confidence, d.sunHours());
         }
-        int daysLeft = (int) Math.max(1, Math.ceil(battery / -trend.slopePerDay()));
-        return new ForecastItem(d.id(), daysLeft, false, confidence, d.sunHours());
+        return new ForecastItem(d.id(), null, !negativeBalance, negativeBalance, balanceOut, confidence, d.sunHours());
     }
 
     /** range: 24h (12 h passadas + 24 futuras, passo 1 h) ou 7d (3 dias passados + 7 futuros, passo 1 dia). */
@@ -92,6 +109,9 @@ public class ForecastService {
 
         Stats.Trend trend = devices.isOnline(d, data) ? trend(data) : null;
         double slope = trend == null ? 0 : trend.slopePerDay();
+        /* saldo negativo: não projeta a bateria subindo, mesmo que a reta suba */
+        Double balance = balanceWhDay(d, data);
+        if (balance != null && balance < 0) slope = Math.min(slope, 0);
         Double current = data.latest() == null ? null : data.latest().battery();
 
         List<Instant> timestamps = new ArrayList<>();
@@ -129,11 +149,24 @@ public class ForecastService {
         return Stats.trend(window, now, Reading::battery, MIN_POINTS);
     }
 
+    /**
+     * Saldo energético médio (Wh/dia) na janela da tendência: coleta − consumo.
+     * Null se o canal não mede as duas grandezas ou se não há leituras delas.
+     */
+    private Double balanceWhDay(DeviceConfig d, DeviceData data) {
+        if (!d.fields().measuresConsumption() || !d.fields().measuresHarvested()) return null;
+        List<Reading> window = DeviceService.since(data.hourly(), clock.instant().minus(Duration.ofHours(TREND_HOURS)));
+        Double harvestedW = Stats.mean(window, Reading::harvestedW);
+        Double consumptionW = Stats.mean(window, Reading::consumptionW);
+        if (harvestedW == null || consumptionW == null) return null;
+        return (harvestedW - consumptionW) * 24;
+    }
+
     /** 99 com pontos bem alinhados e janela completa; desce com ruído e com poucos dados. Mínimo 40. */
     static int confidence(Stats.Trend t) {
         double coverage = Math.min(1, t.points() / (double) TREND_HOURS);
         double value = 100 - 4 * t.residualStd() - 25 * (1 - coverage);
-        return (int) Math.round(Stats.clamp(value, 40, 99));
+        return (int) Math.round(Stats.clamp(value, MIN_CONFIDENCE, 99));
     }
 
     /** Consumo médio (W) na mesma hora do dia ao longo da última semana; fallback se não houver dados. */

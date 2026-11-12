@@ -91,12 +91,19 @@ No ThingSpeak, cada dispositivo costuma ser um canal; `lastSeenAt` = `created_at
 ```json
 {
   "season": "Primavera", "updatedAt": "2026-11-10T14:03:00Z",
-  "items": [{ "id": "IOT-003", "daysLeft": 2, "sustainable": false, "confidence": 91, "sunHours": 4.8 }]
+  "items": [{ "id": "IOT-003", "daysLeft": 2, "sustainable": false, "deficit": false,
+              "balanceWhDay": -5.04, "confidence": 91, "sunHours": 4.8 }]
 }
 ```
-`daysLeft` = dias até a bateria esgotar, ou `null`. Com `daysLeft: null`: `sustainable: true` significa
-que a coleta cobre o consumo; `false` significa sem leitura suficiente. `confidence` em % (ou `null`);
-`sunHours` = horas de sol por dia no local (`null` se o dispositivo não usa solar).
+A previsão usa os últimos 7 dias. `daysLeft` = dias até a bateria esgotar (bateria caindo), ou `null`.
+Com `daysLeft: null`:
+- `sustainable: true`: bateria estável/subindo **e** saldo energético não negativo (ou não medido);
+- `deficit: true`: bateria estável/subindo, mas o consumo supera a coleta (front mostra "Saldo negativo");
+- os dois `false`: sem leitura suficiente (offline ou poucos pontos).
+
+`balanceWhDay` = coleta − consumo médio em Wh/dia (`null` se o canal não mede as duas grandezas).
+`confidence` em % (ou `null`); cai com oscilação da bateria, poucos dados e quando bateria e saldo se
+contradizem. `sunHours` = horas de sol por dia no local (`null` se o dispositivo não usa solar).
 
 ### `GET /api/devices/{id}/forecast?range=24h|7d` → `api.getForecastSeries(id, range)`
 ```json

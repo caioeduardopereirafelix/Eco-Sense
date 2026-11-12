@@ -167,6 +167,9 @@ public class EnergyService {
                 alerts.add(new Alert(d.id() + ":depleting", "critical", "Bateria esgotando",
                         dev.name() + " deve ficar sem bateria em " + f.daysLeft()
                                 + (f.daysLeft() == 1 ? " dia." : " dias."), at));
+            } else if (f.deficit()) {
+                alerts.add(new Alert(d.id() + ":deficit", "warning", "Saldo energético negativo",
+                        dev.name() + " consome mais do que coleta (" + fmtWh(f.balanceWhDay()) + "/dia nos últimos 7 dias).", at));
             }
             Double avg = Stats.mean(DeviceService.since(data.hourly(), now.minus(Duration.ofDays(7))), Reading::consumptionW);
             Double current = data.latest().consumptionW();
@@ -234,5 +237,15 @@ public class EnergyService {
         if (abs >= 1 || abs == 0) return String.format(br, "%.1f W", w);
         if (abs >= 0.0001) return String.format(br, "%.2f mW", w * 1000);
         return String.format(br, "%.0f µW", w * 1_000_000);
+    }
+
+    /** Energia com unidade adaptativa: 1830 → "1,83 kWh"; 0,319 → "319 mWh". */
+    static String fmtWh(double wh) {
+        java.util.Locale br = java.util.Locale.of("pt", "BR");
+        double abs = Math.abs(wh);
+        if (abs >= 100) return String.format(br, "%.3g kWh", wh / 1000);
+        if (abs >= 1 || abs == 0) return String.format(br, "%.3g Wh", wh);
+        if (abs >= 0.001) return String.format(br, "%.3g mWh", wh * 1000);
+        return String.format(br, "%.3g µWh", wh * 1_000_000);
     }
 }
