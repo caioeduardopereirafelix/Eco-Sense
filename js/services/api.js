@@ -36,6 +36,34 @@ const mockApi={
  getSources:()=>wait(MOCK.sources),getLoads:()=>wait(MOCK.loads),
  getBatteries:()=>wait(MOCK.batteries),getDevices:()=>wait(MOCK.devices),getAlerts:()=>wait(MOCK.alerts),
  getForecasts:()=>wait(MOCK.forecast),
+ /* Cadastro de dispositivos. No mock fica só na memória da página (some ao recarregar) e o
+    dispositivo novo aparece Offline, porque não há canal do ThingSpeak para ler. */
+ async getDeviceSettings(id){
+  const d=MOCK.devices.find(x=>x.id===id);if(!d)throw new Error(`Dispositivo ${id} não encontrado.`);
+  return wait(MOCK.settings[id]||{id:d.id,name:d.name,location:d.location,region:d.region,latitude:d.latitude,longitude:d.longitude,
+   txInterval:d.txInterval,type:null,priority:null,harvestingType:d.harvesting?d.harvesting.type:null,sunHours:null,channelId:null,historyChunkDays:null,
+   fields:{battery:'field1',consumption:'field2',temperature:'field3',harvested:'field4'},conversion:{}});
+ },
+ async createDevice(s){
+  if(!s.id||!/^[A-Za-z0-9_-]{1,40}$/.test(s.id))throw new Error('O ID deve ter até 40 caracteres: letras, números, - ou _.');
+  if(!s.name||!s.name.trim())throw new Error('Informe o nome.');
+  if(MOCK.devices.some(d=>d.id===s.id))throw new Error(`Já existe um dispositivo com o ID ${s.id}.`);
+  const d={id:s.id,name:s.name.trim(),location:s.location||null,region:s.region||null,latitude:s.latitude,longitude:s.longitude,status:'Offline',
+   battery:0,consumption:0,lastSeenAt:null,temperature:null,txInterval:s.txInterval||5,harvesting:s.harvestingType?{type:s.harvestingType,collected:0}:null};
+  MOCK.devices.push(d);MOCK.forecast.items.push({id:s.id,daysLeft:null,sustainable:false,confidence:null,sunHours:s.sunHours??null});
+  MOCK.settings[s.id]=structuredClone(s);return wait(d);
+ },
+ async updateDevice(id,s){
+  const d=MOCK.devices.find(x=>x.id===id);if(!d)throw new Error(`Dispositivo ${id} não encontrado.`);
+  if(!s.name||!s.name.trim())throw new Error('Informe o nome.');
+  Object.assign(d,{name:s.name.trim(),location:s.location||null,region:s.region||null,latitude:s.latitude,longitude:s.longitude,txInterval:s.txInterval||d.txInterval});
+  MOCK.settings[id]={...structuredClone(s),id};return wait(d);
+ },
+ async deleteDevice(id){
+  const i=MOCK.devices.findIndex(x=>x.id===id);if(i<0)throw new Error(`Dispositivo ${id} não encontrado.`);
+  MOCK.devices.splice(i,1);MOCK.forecast.items=MOCK.forecast.items.filter(f=>f.id!==id);delete MOCK.settings[id];return wait(null);
+ },
+ async getChannelInfo(){throw new Error('A consulta de canais do ThingSpeak precisa do back-end (defina ECOSENSE_API_URL em js/config.js).')},
  async getMaintenanceRequests(){return wait(readMaintenanceRequests())},
  async requestMaintenance(deviceId,{reason,note}){
   const requests=readMaintenanceRequests();
@@ -116,6 +144,11 @@ const httpApi={
  getForecastSeries:(id,range)=>http(`/devices/${encodeURIComponent(id)}/forecast${query({range})}`),
  getHistory:(range,{from,to}={})=>http(`/history${query({range,from,to})}`),
  getMaintenanceRequests:()=>http('/maintenance-requests'),
+ getDeviceSettings:id=>http(`/devices/${encodeURIComponent(id)}/settings`),
+ createDevice:s=>http('/devices',{method:'POST',body:s}),
+ updateDevice:(id,s)=>http(`/devices/${encodeURIComponent(id)}`,{method:'PUT',body:s}),
+ deleteDevice:id=>http(`/devices/${encodeURIComponent(id)}`,{method:'DELETE'}),
+ getChannelInfo:channelId=>http(`/thingspeak/channels/${encodeURIComponent(channelId)}`),
  requestMaintenance:(deviceId,{reason,note})=>http('/maintenance-requests',{method:'POST',body:{deviceId,reason,note}}),
  updateMaintenanceRequest:(id,{status,scheduledFor})=>http(`/maintenance-requests/${encodeURIComponent(id)}`,{method:'PATCH',body:{status,scheduledFor}})
 };

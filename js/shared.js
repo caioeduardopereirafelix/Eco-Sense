@@ -1,7 +1,8 @@
 /* ===== CÓDIGO COMPARTILHADO (admin e usuário) ===== */
 const $=s=>document.querySelector(s),V=$('#view');
 const tag=s=>`<span class="tag s-${s}">${s}</span>`;
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* escapa HTML; null/undefined viram texto vazio (não "null") */
+const esc=s=>s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* ---------- formatação (a API manda números puros e datas ISO; aqui viram texto pt-BR) ---------- */
 /* num(3.4) → "3,4"; num(3.4,2) → "3,40" (casas fixas) */
 const num=(n,digits)=>Number(n).toLocaleString('pt-BR',digits==null?undefined:{minimumFractionDigits:digits,maximumFractionDigits:digits});

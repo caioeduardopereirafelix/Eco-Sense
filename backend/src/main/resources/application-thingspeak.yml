@@ -11,10 +11,21 @@
 #
 # As listas abaixo SUBSTITUEM as do application.yml (os 10 dispositivos simulados).
 
+# Banco MySQL: guarda o cadastro dos dispositivos e as solicitações de manutenção.
+# Credenciais no .env (nunca neste arquivo): MYSQL_URL, MYSQL_USER, MYSQL_PASSWORD.
+# O banco "ecosense" é criado automaticamente se não existir (createDatabaseIfNotExist).
+spring:
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC}
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:}
+
 ecosense:
   thingspeak:
     simulate: false
 
+  # Dispositivos INICIAIS: copiados para o banco só na primeira execução (tabela vazia).
+  # Depois, adicione/edite/remova pelo painel admin → Dispositivos IoT.
   devices:
     # Coletor de energia: painel solar 65 × 65 mm virado para o teto, numa sala voltada para o sul.
     # Fields do canal: field1 Vbat (V), field2 Pbat (mW, negativo = bateria descarregando),

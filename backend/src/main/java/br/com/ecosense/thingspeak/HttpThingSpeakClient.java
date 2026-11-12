@@ -46,8 +46,28 @@ public class HttpThingSpeakClient implements ThingSpeakClient {
                 .queryParam("average", averageMinutes));
     }
 
+    @Override
+    public ChannelMeta channel(long channelId, String readApiKey) {
+        FeedsResponse body = fetch(channelId, readApiKey, uri -> uri.queryParam("results", 1));
+        Map<String, Object> c = body == null || body.channel() == null ? Map.of() : body.channel();
+        Map<String, String> names = new LinkedHashMap<>();
+        for (int i = 1; i <= 8; i++) {
+            Object label = c.get("field" + i);
+            if (label != null && !label.toString().isBlank()) names.put("field" + i, label.toString());
+        }
+        List<Feed> feeds = body == null || body.feeds() == null ? List.of() : toFeeds(body.feeds());
+        return new ChannelMeta(channelId, text(c.get("name")), text(c.get("description")),
+                number(c.get("latitude")), number(c.get("longitude")), names,
+                feeds.isEmpty() ? null : feeds.get(feeds.size() - 1).createdAt());
+    }
+
     private List<Feed> get(long channelId, String readApiKey, java.util.function.UnaryOperator<UriBuilder> params) {
-        FeedsResponse body = http.get()
+        FeedsResponse body = fetch(channelId, readApiKey, params);
+        return body == null || body.feeds() == null ? List.of() : toFeeds(body.feeds());
+    }
+
+    private FeedsResponse fetch(long channelId, String readApiKey, java.util.function.UnaryOperator<UriBuilder> params) {
+        return http.get()
                 .uri(uri -> {
                     UriBuilder b = uri.path("/channels/{id}/feeds.json").queryParam("timezone", "UTC");
                     if (readApiKey != null && !readApiKey.isBlank()) b = b.queryParam("api_key", readApiKey);
@@ -55,7 +75,20 @@ public class HttpThingSpeakClient implements ThingSpeakClient {
                 })
                 .retrieve()
                 .body(FeedsResponse.class);
-        return body == null || body.feeds() == null ? List.of() : toFeeds(body.feeds());
+    }
+
+    private static String text(Object v) {
+        return v == null || v.toString().isBlank() ? null : v.toString().trim();
+    }
+
+    /** O ThingSpeak usa "0.0" quando o canal não tem localização: vira null. */
+    private static Double number(Object v) {
+        try {
+            double d = Double.parseDouble(String.valueOf(v));
+            return d == 0 || !Double.isFinite(d) ? null : d;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static List<Feed> toFeeds(List<Map<String, Object>> raw) {
@@ -73,5 +106,5 @@ public class HttpThingSpeakClient implements ThingSpeakClient {
     }
 
     /** Resposta do ThingSpeak: {"channel": {...}, "feeds": [{"created_at": "...", "field1": "..."}]} */
-    record FeedsResponse(List<Map<String, Object>> feeds) {}
+    record FeedsResponse(Map<String, Object> channel, List<Map<String, Object>> feeds) {}
 }

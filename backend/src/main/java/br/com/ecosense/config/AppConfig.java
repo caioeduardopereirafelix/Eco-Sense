@@ -28,6 +28,6 @@ public class AppConfig implements WebMvcConfigurer {
         if (props.corsOrigins().isEmpty()) return;
         registry.addMapping("/api/**")
                 .allowedOrigins(props.corsOrigins().toArray(String[]::new))
-                .allowedMethods("GET", "POST", "PATCH", "OPTIONS");
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
     }
 }

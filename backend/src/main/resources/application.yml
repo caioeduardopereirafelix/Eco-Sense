@@ -13,6 +13,18 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  # Banco do modo simulado: H2 em memória (some ao reiniciar; não precisa instalar nada).
+  # O perfil "thingspeak" usa MySQL (ver application-thingspeak.yml).
+  datasource:
+    url: jdbc:h2:mem:ecosense;DB_CLOSE_DELAY=-1;MODE=MySQL
+    username: sa
+    password:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update           # cria/atualiza as tabelas a partir das entidades
+    properties:
+      hibernate.jdbc.time_zone: UTC
 
 ecosense:
   thingspeak:
@@ -34,6 +46,8 @@ ecosense:
     - http://localhost:3000
 
   # ------------------------------------------------------------------
+  # Dispositivos INICIAIS: na primeira execução (tabela "devices" vazia) são copiados para o banco.
+  # Depois disso, o cadastro vive no banco e é editado pelo painel admin (Dispositivos IoT).
   # Dispositivos: cadastro + canal do ThingSpeak.
   # fields: em qual field do canal está cada leitura (padrão field1..field4):
   #   battery (%), consumption (W), temperature (°C), harvested (W)

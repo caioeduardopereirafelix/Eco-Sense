@@ -5,78 +5,80 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.com.ecosense.api.ApiDtos.MaintenanceRequest;
 import br.com.ecosense.api.ApiDtos.MaintenanceUpdate;
 import br.com.ecosense.api.ApiDtos.NewMaintenanceRequest;
 import br.com.ecosense.api.ApiException;
 import br.com.ecosense.config.EcoSenseProperties;
+import br.com.ecosense.persistence.MaintenanceRequestEntity;
+import br.com.ecosense.persistence.MaintenanceRequestRepository;
 
-/**
- * Solicitações de manutenção. Guardadas em memória (somem ao reiniciar):
- * o próximo passo é trocar por um repositório com banco de dados (ex.: Spring Data JPA).
- */
+/** Solicitações de manutenção, guardadas no banco (tabela maintenance_requests). */
 @Service
 public class MaintenanceService {
 
     public static final List<String> STATUSES = List.of("Recebida", "Agendada", "Em rota", "Concluída");
 
+    private final MaintenanceRequestRepository repository;
     private final DeviceService devices;
     private final EcoSenseProperties props;
     private final Clock clock;
-    private final Map<Long, MaintenanceRequest> store = new ConcurrentHashMap<>();
-    private final AtomicLong ids = new AtomicLong();
 
-    public MaintenanceService(DeviceService devices, EcoSenseProperties props, Clock clock) {
+    public MaintenanceService(MaintenanceRequestRepository repository, DeviceService devices,
+                              EcoSenseProperties props, Clock clock) {
+        this.repository = repository;
         this.devices = devices;
         this.props = props;
         this.clock = clock;
     }
 
     public List<MaintenanceRequest> list() {
-        List<MaintenanceRequest> all = new ArrayList<>(store.values());
-        all.sort((a, b) -> Long.compare(a.id(), b.id()));
-        return all;
+        return repository.findAllByOrderByIdAsc().stream().map(MaintenanceService::toDto).toList();
     }
 
+    @Transactional
     public MaintenanceRequest create(NewMaintenanceRequest body) {
         devices.config(body.deviceId()); // 404 se o dispositivo não existir
-        long id = ids.incrementAndGet();
-        MaintenanceRequest r = new MaintenanceRequest(id, body.deviceId(), body.reason().trim(),
-                body.note() == null ? "" : body.note().trim(), "Recebida",
-                Instant.now(clock).truncatedTo(ChronoUnit.SECONDS), null);
-        store.put(id, r);
-        return r;
+        MaintenanceRequestEntity e = new MaintenanceRequestEntity();
+        e.setDeviceId(body.deviceId());
+        e.setReason(body.reason().trim());
+        e.setNote(body.note() == null ? "" : body.note().trim());
+        e.setStatus("Recebida");
+        e.setCreatedAt(Instant.now(clock).truncatedTo(ChronoUnit.SECONDS));
+        return toDto(repository.save(e));
     }
 
     /**
      * Regras: data vazia mantém a já agendada; voltar para "Recebida" limpa a data;
      * "Agendada" exige data válida e não passada.
      */
-    public synchronized MaintenanceRequest update(long id, MaintenanceUpdate body) {
+    @Transactional
+    public MaintenanceRequest update(long id, MaintenanceUpdate body) {
         if (!STATUSES.contains(body.status())) throw ApiException.badRequest("Status de manutenção inválido.");
-        MaintenanceRequest current = store.get(id);
-        if (current == null) throw ApiException.notFound("Solicitação de manutenção não encontrada.");
+        MaintenanceRequestEntity e = repository.findById(id)
+                .orElseThrow(() -> ApiException.notFound("Solicitação de manutenção não encontrada."));
 
         LocalDate day = parseDay(body.scheduledFor());
         if ("Recebida".equals(body.status())) day = null;
-        else if (day == null) day = current.scheduledFor();
+        else if (day == null) day = e.getScheduledFor();
         if ("Agendada".equals(body.status())) {
             if (day == null) throw ApiException.badRequest("Informe uma data válida para o agendamento.");
             if (day.isBefore(LocalDate.now(clock.withZone(props.zone()))))
                 throw ApiException.badRequest("A data do agendamento não pode estar no passado.");
         }
-        MaintenanceRequest updated = new MaintenanceRequest(current.id(), current.deviceId(), current.reason(),
-                current.note(), body.status(), current.createdAt(), day);
-        store.put(id, updated);
-        return updated;
+        e.setStatus(body.status());
+        e.setScheduledFor(day);
+        return toDto(repository.save(e));
+    }
+
+    private static MaintenanceRequest toDto(MaintenanceRequestEntity e) {
+        return new MaintenanceRequest(e.getId(), e.getDeviceId(), e.getReason(), e.getNote(),
+                e.getStatus(), e.getCreatedAt(), e.getScheduledFor());
     }
 
     private static LocalDate parseDay(String value) {

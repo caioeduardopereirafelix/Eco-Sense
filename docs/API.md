@@ -128,6 +128,39 @@ Horas/dias sem leitura (ou no futuro) vêm `null`.
 Os agregados podem vir da própria API do ThingSpeak (parâmetros `average`/`sum` e `timescale`) ou ser
 calculados no back-end.
 
+### Cadastro de dispositivos (admin)
+
+`GET /api/devices/{id}/settings` → `api.getDeviceSettings(id)` — configuração editável (não traz leituras):
+```json
+{
+  "id": "IOT-001", "name": "Harveo – coletor solar", "location": "Laboratório EMBEDO (indoor)",
+  "region": "Gdańsk", "latitude": 54.424526, "longitude": 18.478837, "txInterval": 1,
+  "type": "Sensor", "priority": "Alta", "harvestingType": "Solar", "sunHours": null,
+  "channelId": 2988514, "historyChunkDays": 2,
+  "fields": { "battery": "field1", "consumption": "field2", "temperature": "none", "harvested": "field4" },
+  "conversion": { "batteryVoltageMin": 3.0, "batteryVoltageMax": 4.2,
+                  "consumptionScale": -0.001, "harvestedScale": 0.001, "temperatureScale": 1.0 }
+}
+```
+`fields.*`: `field1`…`field8` ou `none` (o canal não mede). `conversion` é opcional: com
+`batteryVoltageMin/Max` a bateria é lida em volts e convertida para %; as escalas multiplicam o valor lido.
+
+`POST /api/devices` → `api.createDevice(settings)` — mesmo corpo; responde `201` com o dispositivo
+(formato de `GET /api/devices/{id}`). `409` se o ID já existir.
+
+`PUT /api/devices/{id}` → `api.updateDevice(id, settings)` — o ID não pode mudar.
+
+`DELETE /api/devices/{id}` → `api.deleteDevice(id)` — responde `204`. Só apaga o cadastro.
+
+`GET /api/thingspeak/channels/{channelId}` → `api.getChannelInfo(channelId)` — ajuda a preencher o cadastro:
+```json
+{ "channelId": 181889, "name": "Solar Weather Station (Outside2-17)", "description": "…",
+  "latitude": 35.337296, "longitude": 139.624439,
+  "fields": { "field1": "RSSIOut", "field2": "BatOut", "field3": "TempOut" },
+  "lastEntryAt": "2026-11-12T02:25:00Z" }
+```
+`404` se o canal não existir ou for privado sem Read API Key válida.
+
 ### Manutenção
 
 `GET /api/maintenance-requests` → `api.getMaintenanceRequests()`
@@ -142,5 +175,5 @@ corpo `{ "deviceId": "IOT-007", "reason": "…", "note": "…" }`; responde com 
 
 `PATCH /api/maintenance-requests/{id}` → `api.updateMaintenanceRequest(id, {status, scheduledFor})`
 corpo `{ "status": "Agendada", "scheduledFor": "2026-11-21" }`; responde com a solicitação atualizada.
-Regras (hoje validadas no mock, devem ir para o back-end): `scheduledFor` vazio mantém a data atual;
+Regras (validadas no back-end e no mock): `scheduledFor` vazio mantém a data atual;
 voltar para `Recebida` limpa a data; `Agendada` exige data válida e não passada.

@@ -14,4 +14,7 @@ public interface ThingSpeakClient {
      * {@code averageMinutes} minutos (o ThingSpeak aceita 10, 15, 20, 30, 60, 240, 720 e 1440).
      */
     List<Feed> averaged(long channelId, String readApiKey, Instant start, Instant end, int averageMinutes);
+
+    /** Nome, descrição, localização e nomes dos fields do canal (para o cadastro de dispositivos). */
+    ChannelMeta channel(long channelId, String readApiKey);
 }

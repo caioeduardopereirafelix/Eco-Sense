@@ -20,7 +20,7 @@ const harvestText=(d,emptyLabel)=>d.harvesting
  ?`${perDay(d.harvesting.collected)} <span class="mu">(${esc(d.harvesting.type)})</span>`
  :`<span class="mu">${emptyLabel}</span>`;
 /* topo comum dos cards de dispositivo: local, nome, status e bateria */
-const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}${esc(d.location)}</h3>
+const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}${esc(d.location||'Local não informado')}</h3>
    <div class="big" style="font-size:20px">${esc(d.name)}</div>
    <div style="margin-top:6px">${tag(d.status)}</div>
    ${bar(d.battery)}
@@ -98,7 +98,7 @@ async function renderForecast({detailed=false}={}){
  let sel=(first||withReading[0]||rows[0]).d.id,range='24h',drawToken=0;
  const idSuffix=d=>detailed?` <span class="mu">${esc(d.id)}</span>`:'';
  const tr=({d,f})=>`<tr>
-  <td>${esc(d.name)}${idSuffix(d)}</td>${detailed?`<td>${esc(d.location)}</td>`:''}
+  <td>${esc(d.name)}${idSuffix(d)}</td>${detailed?`<td>${esc(d.location||'—')}</td>`:''}
   <td>${daysTag(f)}</td><td>${f.confidence==null?'—':f.confidence+'%'}</td>
   ${detailed?`<td>${f.sunHours==null?'—':num(f.sunHours)+' h/dia'}</td>`:''}<td>${num(d.battery)}%</td>
   <td>${f.daysLeft!=null||f.sustainable?`<button class="btn" data-pick="${esc(d.id)}" aria-label="Ver gráficos de ${esc(d.name)}">Ver<span class="pvx"> gráficos</span></button>`:''}</td></tr>`;

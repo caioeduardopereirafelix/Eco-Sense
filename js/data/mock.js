@@ -52,6 +52,8 @@ const MOCK={
   {id:4,level:'info',    title:'Sistema normal', message:'Todos os dispositivos da Área Remota A estão funcionando normalmente.',createdAt:minutesAgo(120)}
  ],
  /* Solicitações de manutenção feitas pelo usuário (portal do usuário) */
+ /* configuração de cadastro dos dispositivos criados/editados no admin (só nesta sessão) */
+ settings:{},
  requests:[{id:1,deviceId:'IOT-007',reason:'Dispositivo offline',note:'',status:'Recebida',createdAt:'2026-10-15T12:00:00.000Z',scheduledFor:null}],
  /* Previsão de bateria por dispositivo (viria do modelo preditivo do back-end).
     daysLeft = dias até a bateria esgotar; null + sustainable = coleta >= consumo (sem esgotamento previsto);

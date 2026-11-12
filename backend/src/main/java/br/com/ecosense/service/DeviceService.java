@@ -20,21 +20,24 @@ import br.com.ecosense.service.ReadingService.DeviceData;
 public class DeviceService {
 
     private final ReadingService readings;
+    private final DeviceCatalog catalog;
     private final EcoSenseProperties props;
     private final Clock clock;
 
-    public DeviceService(ReadingService readings, EcoSenseProperties props, Clock clock) {
+    public DeviceService(ReadingService readings, DeviceCatalog catalog, EcoSenseProperties props, Clock clock) {
         this.readings = readings;
+        this.catalog = catalog;
         this.props = props;
         this.clock = clock;
     }
 
+    /** Dispositivos cadastrados (no banco). */
     public List<DeviceConfig> configs() {
-        return props.devices();
+        return catalog.all();
     }
 
     public DeviceConfig config(String id) {
-        return props.devices().stream().filter(d -> d.id().equals(id)).findFirst()
+        return catalog.find(id)
                 .orElseThrow(() -> ApiException.notFound("Dispositivo " + id + " não encontrado."));
     }
 

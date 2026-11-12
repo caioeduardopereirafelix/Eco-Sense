@@ -50,6 +50,25 @@ class HttpThingSpeakClientTest {
     }
 
     @Test
+    void dadosDoCanalComNomesDosFields() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://api.thingspeak.com/channels/12345/feeds.json")))
+                .andExpect(queryParam("results", "1"))
+                .andRespond(withSuccess("""
+                        {"channel":{"id":12345,"name":"Sensor 01","description":"Teste","latitude":"0.0","longitude":"0.0",
+                                    "field1":"Bateria","field2":"Consumo"},
+                         "feeds":[{"created_at":"2026-11-10T14:05:00Z","entry_id":2,"field1":"87"}]}""",
+                        MediaType.APPLICATION_JSON));
+
+        ChannelMeta m = client.channel(12345, null);
+
+        assertThat(m.name()).isEqualTo("Sensor 01");
+        assertThat(m.fields()).containsEntry("field1", "Bateria").containsEntry("field2", "Consumo").hasSize(2);
+        assertThat(m.latitude()).as("0.0 = sem localização").isNull();
+        assertThat(m.lastEntryAt()).isEqualTo(Instant.parse("2026-11-10T14:05:00Z"));
+        server.verify();
+    }
+
+    @Test
     void mediasEnviamPeriodoNoFormatoDoThingSpeakSemChaveParaCanalPublico() {
         server.expect(requestTo(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("api_key"))))
                 .andExpect(queryParam("start", "2026-11-09%2000:00:00"))

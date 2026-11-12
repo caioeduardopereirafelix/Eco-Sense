@@ -113,7 +113,7 @@ async manutencao(){
    const markers=points.map(d=>{
     const risk=riskOf(d);
     const marker=window.L.circleMarker([d.latitude,d.longitude],{radius:9,color:risk.color,fillColor:risk.color,fillOpacity:.85,weight:2}).addTo(map);
-    marker.bindPopup(`<b>${esc(d.name)}</b><br>${esc(d.location)} · ${esc(d.region||'Sem região')}<br>Risco: ${risk.label} · Bateria: ${num(d.battery)}%`);
+    marker.bindPopup(`<b>${esc(d.name)}</b><br>${esc(d.location||'Local não informado')} · ${esc(d.region||'Sem região')}<br>Risco: ${risk.label} · Bateria: ${num(d.battery)}%`);
     return marker
    });
    if(markers.length){const b=window.L.featureGroup(markers).getBounds();map.fitBounds(b.pad(.2));map.setMaxBounds(b.pad(4))}
@@ -133,9 +133,10 @@ async manutencao(){
  };
  draw()
 },
-async dispositivos(){
+async dispositivos(notice=''){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
+ let current='all',form=null; /* form: null | {mode:'new'|'edit', s: configuração, channel: dados do canal} */
  /* saldo = energia coletada - consumo (Wh). Sem harvesting, o saldo é só o consumo negativo. */
  /* null quando falta consumo ou coleta medidos (não dá para calcular o saldo) */
  const balance=d=>d.consumption==null||(d.harvesting&&d.harvesting.collected==null)?null:(d.harvesting?d.harvesting.collected:0)-d.consumption;
@@ -161,16 +162,124 @@ async dispositivos(){
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
     ${kvRow('Transmissão',`a cada ${num(d.txInterval)} min`)}
    </dl>
+   <div class="card-actions"><button class="btn" data-edit="${esc(d.id)}">Editar</button><button class="btn danger" data-del="${esc(d.id)}">Remover</button></div>
   </div>`;
  };
  const draw=k=>{
+  current=k;
   const list=devices.filter(filtersFn[k]);
-  V.innerHTML='';
-  V.append(filters([['all','Todos'],['on','Online'],['off','Offline'],['low','Bateria baixa'],['neg','Saldo negativo'],['risk','Em risco (≤ 7 dias)']],k,draw));
+  V.innerHTML=notice?`<div class="banner" role="status">${esc(notice)}</div>`:'';
+  const top=filters([['all','Todos'],['on','Online'],['off','Offline'],['low','Bateria baixa'],['neg','Saldo negativo'],['risk','Em risco (≤ 7 dias)']],k,draw);
+  top.insertAdjacentHTML('beforeend','<button class="btn on" data-new="1" style="margin-left:auto">+ Novo dispositivo</button>');
+  V.append(top);
+  if(form)V.insertAdjacentHTML('beforeend',deviceForm(form));
   V.insertAdjacentHTML('beforeend',list.length
    ?`<div class="grid">${list.map(card).join('')}</div>`
    :'<div class="card mu">Nenhum dispositivo neste filtro.</div>');
+  if(form)$('#devform').scrollIntoView({block:'start'});
  };
+
+ /* ---------- cadastro: formulário de novo dispositivo / edição ---------- */
+ const FIELD_KEYS=[['battery','Bateria'],['consumption','Consumo'],['temperature','Temperatura'],['harvested','Energia coletada']];
+ const fieldOptions=(sel,channel)=>['none',...[1,2,3,4,5,6,7,8].map(i=>'field'+i)].map(f=>{
+  const label=f==='none'?'— não mede':(channel&&channel.fields[f]?`${f} · ${channel.fields[f]}`:f);
+  return`<option value="${f}"${f===sel?' selected':''}>${esc(label)}</option>`}).join('');
+ const input=(name,label,value,attrs='')=>`<label>${label}<input name="${name}" value="${value==null?'':esc(value)}" ${attrs}></label>`;
+ const deviceForm=({mode,s,channel,error})=>{
+  const f=s.fields||{},c=s.conversion||{};
+  return`<form class="card" id="devform" style="margin-bottom:16px" novalidate>
+   <h3>${mode==='new'?'Novo dispositivo':`Editar ${esc(s.id)}`}</h3>
+   <div class="form-sec">Identificação</div>
+   <div class="form-grid">
+    ${input('id','ID *',s.id,mode==='edit'?'disabled':'maxlength="40" placeholder="ex.: IOT-011"')}
+    ${input('name','Nome *',s.name,'maxlength="80"')}
+    ${input('location','Local',s.location,'maxlength="120"')}
+    ${input('region','Região',s.region,'maxlength="60"')}
+    ${input('latitude','Latitude',s.latitude,'inputmode="decimal"')}
+    ${input('longitude','Longitude',s.longitude,'inputmode="decimal"')}
+    ${input('type','Tipo',s.type,'list="dl-type" maxlength="40"')}
+    <label>Prioridade<select name="priority">${['Alta','Média','Baixa'].map(p=>`<option${p===(s.priority||'Média')?' selected':''}>${p}</option>`).join('')}</select></label>
+    ${input('harvestingType','Tipo de coleta',s.harvestingType,'list="dl-harv" maxlength="40" placeholder="vazio = não coleta"')}
+    ${input('txInterval','Envia a cada (min)',s.txInterval,'inputmode="numeric"')}
+    ${input('sunHours','Horas de sol/dia',s.sunHours,'inputmode="decimal"')}
+   </div>
+   <datalist id="dl-type"><option>Sensor<option>Comunicação<option>Atuador<option>Vídeo<option>Sistema solar<option>Residência</datalist>
+   <datalist id="dl-harv"><option>Solar<option>Térmico<option>Cinético<option>Vibração<option>RF</datalist>
+   <div class="form-sec">Canal do ThingSpeak</div>
+   <div class="form-grid">
+    <label>Channel ID<span style="display:flex;gap:6px"><input name="channelId" value="${s.channelId??''}" inputmode="numeric"><button type="button" class="btn" data-fetch="1" style="white-space:nowrap">Buscar canal</button></span></label>
+    ${input('historyChunkDays','Dias por pedido do histórico',s.historyChunkDays,'inputmode="numeric" placeholder="31 (canais rápidos: 2)"')}
+   </div>
+   <div class="mu" id="chinfo" style="margin-top:8px">${channel?`Canal <b>${esc(channel.name||'')}</b>${channel.lastEntryAt?` · última entrada ${esc(timeAgo(channel.lastEntryAt))}`:' · sem entradas'}${channel.description?` · ${esc(channel.description.slice(0,140))}`:''}`:'Informe o Channel ID e clique em Buscar canal para ver o nome de cada field.'}</div>
+   <div class="form-grid" style="margin-top:8px">
+    ${FIELD_KEYS.map(([k,l])=>`<label>${l}<select name="f_${k}">${fieldOptions(f[k]||'none',channel)}</select></label>`).join('')}
+   </div>
+   <div class="form-sec">Conversões (opcional)</div>
+   <div class="mu" style="margin-bottom:8px">Bateria em volts: informe as tensões de vazia e cheia para converter em %. Escalas multiplicam o valor lido (ex.: 0,001 para mW → W; negativo inverte o sinal).</div>
+   <div class="form-grid">
+    ${input('batteryVoltageMin','Bateria vazia (V)',c.batteryVoltageMin,'inputmode="decimal"')}
+    ${input('batteryVoltageMax','Bateria cheia (V)',c.batteryVoltageMax,'inputmode="decimal"')}
+    ${input('consumptionScale','Escala do consumo',c.consumptionScale,'inputmode="decimal" placeholder="1"')}
+    ${input('harvestedScale','Escala da coleta',c.harvestedScale,'inputmode="decimal" placeholder="1"')}
+    ${input('temperatureScale','Escala da temperatura',c.temperatureScale,'inputmode="decimal" placeholder="1"')}
+   </div>
+   <div role="alert" style="color:var(--cr);min-height:20px;margin-top:12px;font-size:13px">${esc(error||'')}</div>
+   <div class="row" style="margin:8px 0 0"><button class="btn on" type="submit">Salvar</button><button class="btn" type="button" data-cancel="1">Cancelar</button></div>
+  </form>`};
+ /* lê o formulário; números aceitam vírgula; vazio = null */
+ const readForm=()=>{
+  const el=$('#devform'),v=n=>el.elements[n].value.trim();
+  const n=x=>{const t=v(x).replace(',','.');if(t==='')return null;const r=Number(t);if(!Number.isFinite(r))throw new Error(`Valor inválido em "${el.elements[x].closest('label').firstChild.textContent.trim()}".`);return r};
+  return{id:form.mode==='edit'?form.s.id:v('id'),name:v('name'),location:v('location')||null,region:v('region')||null,
+   latitude:n('latitude'),longitude:n('longitude'),type:v('type')||null,priority:v('priority'),harvestingType:v('harvestingType')||null,
+   txInterval:n('txInterval'),sunHours:n('sunHours'),channelId:n('channelId'),historyChunkDays:n('historyChunkDays'),
+   fields:Object.fromEntries(FIELD_KEYS.map(([k])=>[k,v('f_'+k)])),
+   conversion:{batteryVoltageMin:n('batteryVoltageMin'),batteryVoltageMax:n('batteryVoltageMax'),
+    consumptionScale:n('consumptionScale'),harvestedScale:n('harvestedScale'),temperatureScale:n('temperatureScale')}};
+ };
+
+ V.onclick=async e=>{
+  const t=e.target.closest('[data-new],[data-edit],[data-del],[data-cancel],[data-fetch]');if(!t)return;
+  if(t.dataset.new){notice='';form={mode:'new',s:{priority:'Média',txInterval:5,fields:{battery:'field1',consumption:'field2',temperature:'field3',harvested:'field4'},conversion:{}}};draw(current)}
+  else if(t.dataset.cancel){form=null;draw(current)}
+  else if(t.dataset.edit){
+   notice='';t.disabled=true;
+   try{form={mode:'edit',s:await api.getDeviceSettings(t.dataset.edit)};draw(current)}
+   catch(err){notice=`Não foi possível abrir o cadastro: ${err.message}`;draw(current)}
+  }
+  else if(t.dataset.del){
+   const d=devices.find(x=>x.id===t.dataset.del);
+   if(!confirm(`Remover "${d.name}" (${d.id})?\n\nSó o cadastro é apagado; os dados continuam no ThingSpeak.`))return;
+   try{await api.deleteDevice(d.id);await pages.dispositivos(`Dispositivo ${d.name} removido.`)}
+   catch(err){notice=`Não foi possível remover: ${err.message}`;draw(current)}
+  }
+  else if(t.dataset.fetch){
+   try{form.s=readForm()}catch(err){form.error=err.message;draw(current);return}
+   if(!form.s.channelId){form.error='Informe o Channel ID.';draw(current);return}
+   t.textContent='Buscando…';t.disabled=true;
+   try{
+    const ch=await api.getChannelInfo(form.s.channelId);
+    form.channel=ch;form.error='';
+    /* preenche o que estiver vazio com os dados do canal */
+    if(!form.s.name)form.s.name=ch.name;
+    if(form.s.latitude==null&&ch.latitude!=null){form.s.latitude=ch.latitude;form.s.longitude=ch.longitude}
+   }catch(err){form.error=err.message}
+   draw(current);
+  }
+ };
+ V.onsubmit=async e=>{
+  /* getAttribute: o form tem um campo "id", e form.id devolveria esse campo, não o atributo */
+  if(e.target.getAttribute('id')!=='devform')return;
+  e.preventDefault();
+  const btn=e.target.querySelector('[type=submit]');
+  try{form.s=readForm()}catch(err){form.error=err.message;draw(current);return}
+  btn.disabled=true;btn.textContent='Salvando…';
+  try{
+   if(form.mode==='new')await api.createDevice(form.s);else await api.updateDevice(form.s.id,form.s);
+   await pages.dispositivos(`Dispositivo ${form.s.name} salvo.`);
+  }catch(err){form.error=err.message;draw(current)}
+ };
+ onLeave(()=>{V.onsubmit=null});
  draw('all')},
 previsao:()=>renderForecast({detailed:true}),
 historico:()=>renderHistory({custom:true,storageTitle:'Energia armazenada'}),

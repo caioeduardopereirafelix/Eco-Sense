@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -16,6 +17,7 @@ import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 import br.com.ecosense.config.EcoSenseProperties.Simulation;
 import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
+import br.com.ecosense.service.DeviceCatalog;
 
 /**
  * Gera leituras no mesmo formato do ThingSpeak, a partir dos parâmetros {@code sim} de cada
@@ -28,9 +30,12 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
 
     private final EcoSenseProperties props;
     private final Clock clock;
+    /* lazy: o catálogo depende (indiretamente) deste cliente */
+    private final ObjectProvider<DeviceCatalog> catalog;
 
-    public SimulatedThingSpeakClient(EcoSenseProperties props, Clock clock) {
+    public SimulatedThingSpeakClient(EcoSenseProperties props, Clock clock, ObjectProvider<DeviceCatalog> catalog) {
         this.props = props;
+        this.catalog = catalog;
         this.clock = clock;
     }
 
@@ -57,6 +62,25 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         return feeds;
     }
 
+    /** Canal simulado: nomes de fields padrão do EcoSense; nome/local do dispositivo que usa o canal, se houver. */
+    @Override
+    public ChannelMeta channel(long channelId, String readApiKey) {
+        Optional<DeviceConfig> device = catalog.getObject().all().stream()
+                .filter(d -> d.channelId() != null && d.channelId() == channelId).findFirst();
+        Map<String, String> fields = new java.util.LinkedHashMap<>();
+        fields.put("field1", "Bateria (%)");
+        fields.put("field2", "Consumo (W)");
+        fields.put("field3", "Temperatura (°C)");
+        fields.put("field4", "Energia coletada (W)");
+        Instant now = clock.instant();
+        return new ChannelMeta(channelId,
+                device.map(DeviceConfig::name).orElse("Canal simulado " + channelId),
+                "Canal gerado pelo modo simulado do EcoSense",
+                device.map(DeviceConfig::latitude).orElse(null),
+                device.map(DeviceConfig::longitude).orElse(null),
+                fields, lastTransmission(channelId, now));
+    }
+
     /** Dispositivos "offline" na simulação param de transmitir há {@code offlineMinutes}. */
     private Instant lastTransmission(long channelId, Instant now) {
         Integer offline = simulation(channelId).offlineMinutes();
@@ -64,7 +88,7 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
     }
 
     private Feed feedAt(long channelId, Instant t, Instant now) {
-        Optional<DeviceConfig> device = props.devices().stream()
+        Optional<DeviceConfig> device = catalog.getObject().all().stream()
                 .filter(d -> d.channelId() != null && d.channelId() == channelId).findFirst();
         if (device.isPresent()) return deviceFeed(device.get(), t, now);
         StorageConfig storage = props.storage().stream()
@@ -99,7 +123,7 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
     }
 
     private Simulation simulation(long channelId) {
-        return props.devices().stream()
+        return catalog.getObject().all().stream()
                 .filter(d -> d.channelId() != null && d.channelId() == channelId)
                 .map(DeviceConfig::sim).findFirst()
                 .orElseGet(() -> props.storage().stream()

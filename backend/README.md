@@ -31,6 +31,33 @@ As origens liberadas no CORS ficam em `ecosense.cors-origins`.
 
 Testes: `./mvnw test`
 
+## Banco de dados (MySQL)
+
+O **cadastro dos dispositivos** (nome, local, canal do ThingSpeak, fields, conversões) e as
+**solicitações de manutenção** ficam no banco. As **leituras** não: continuam vindo do ThingSpeak em
+tempo real.
+
+| Modo | Banco | Precisa instalar? |
+|---|---|---|
+| Simulado (padrão) e testes | H2 em memória (some ao reiniciar) | Não |
+| Perfil `thingspeak` | **MySQL** (tabelas `devices` e `maintenance_requests`) | Sim, MySQL 8 |
+
+Configure o acesso no `backend/.env` (modelo em [`.env.example`](.env.example)):
+
+```properties
+MYSQL_URL=jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC
+MYSQL_USER=root
+MYSQL_PASSWORD=sua_senha
+```
+
+- O banco `ecosense` e as tabelas são **criados sozinhos** na primeira execução (Hibernate `ddl-auto: update`).
+- Com a tabela `devices` vazia, os dispositivos do `application-thingspeak.yml` são **copiados para o
+  banco uma única vez**. Depois disso, o YAML não é mais lido para dispositivos: adicione, edite e remova
+  pelo painel **admin → Dispositivos IoT** (botão "+ Novo dispositivo" e "Buscar canal", que lê o nome
+  dos fields no ThingSpeak). Para voltar ao cadastro inicial, apague as linhas da tabela `devices`.
+- A Read API Key **não** é guardada no banco (continua no `.env`).
+- As baterias do sistema (`ecosense.storage`) continuam no YAML.
+
 ## Rodar com dados reais (perfil `thingspeak`)
 
 O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspeak.yml) desliga a simulação e
@@ -118,6 +145,10 @@ Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses
 
 ## Conectar outros canais ao ThingSpeak
 
+O jeito mais simples é pelo painel **admin → Dispositivos IoT → "+ Novo dispositivo"**: informe o
+Channel ID, clique em **Buscar canal** e escolha em qual field está cada leitura. O que segue abaixo é
+para definir os dispositivos **iniciais** (copiados para o banco só quando ele está vazio).
+
 1. Em [`src/main/resources/application.yml`](src/main/resources/application.yml) (ou no perfil `thingspeak`), para cada dispositivo
    em `ecosense.devices`, coloque o `channel-id` real e diga em qual field está cada leitura:
 
@@ -156,15 +187,18 @@ Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses
 | Energia (kWh) | Cada média horária (W) × 1 h, somadas no período. |
 | Previsão de autonomia | Tendência linear da bateria nas últimas 72 h. Queda → dias até zerar; estável/subindo → sustentável. A confiança cai com ruído e falta de dados. |
 | Alertas | Offline, bateria < 20 %, esgotando em ≤ 3 dias, consumo > 1,5× a média de 7 dias, geração < 70 % da de ontem. |
-| Manutenção | Em memória (some ao reiniciar). Próximo passo: banco de dados (Spring Data JPA). |
+| Cadastro de dispositivos | Banco (tabela `devices`), com cópia em memória recarregada a cada alteração. |
+| Manutenção | Banco (tabela `maintenance_requests`). |
 
 ## Estrutura
 
 ```
 src/main/java/br/com/ecosense/
 ├── config/       EcoSenseProperties (application.yml), CORS, Clock
+├── persistence/  Entidades JPA e repositórios: DeviceEntity, MaintenanceRequestEntity
 ├── thingspeak/   ThingSpeakClient: HttpThingSpeakClient (real) e SimulatedThingSpeakClient
-├── service/      ReadingService (cache), DeviceService, ForecastService, HistoryService,
-│                 EnergyService (visão geral, fontes, cargas, baterias, alertas), MaintenanceService
-└── api/          ApiController (/api/...), ApiDtos (formatos de resposta), tratamento de erros
+├── service/      DeviceCatalog (cadastro no banco), ReadingService (cache), DeviceService,
+│                 ForecastService, HistoryService, EnergyService (visão geral, fontes, cargas,
+│                 baterias, alertas), MaintenanceService
+└── api/          ApiController (/api/...), DeviceAdminController (cadastro), ApiDtos, erros
 ```
