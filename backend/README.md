@@ -41,10 +41,34 @@ Ao iniciar, o log mostra `Read API Key configurada (N caracteres)` (ou `NÃO con
 primeira consulta com o banco vazio, `Banco vazio: 10 dispositivo(s) iniciais copiados da configuração`.
 Se aparecer `Access denied for user`, confira `MYSQL_USER`/`MYSQL_PASSWORD`.
 
+## Login e perfis
+
+A API exige login (Spring Security + token JWT assinado com HMAC-SHA256). Perfis:
+
+- **ADMIN**: painel `/admin` (cadastro de dispositivos, manutenção, **Usuários**) e portal do usuário;
+- **USER**: só o portal do usuário; vê apenas os próprios pedidos de manutenção.
+
+**Primeiro acesso.** Com a tabela `app_users` vazia, o back-end cria um administrador:
+
+| Variável no `.env` | Padrão |
+|---|---|
+| `ECOSENSE_ADMIN_EMAIL` | `admin@ecosense.local` |
+| `ECOSENSE_ADMIN_PASSWORD` | vazio → o back-end gera uma senha e a mostra **uma única vez** no log de inicialização |
+| `JWT_SECRET` | vazio → chave aleatória: todos precisam entrar de novo quando o back-end reinicia. Use 32+ caracteres. |
+
+Entre em `login.html` com esse e-mail, troque a senha em **Configurações → Alterar senha** e crie os
+outros usuários em **Usuários**. Esqueceu a senha do único administrador? Apague a linha dele na
+tabela `app_users` (com a tabela vazia, o administrador inicial é criado de novo).
+
+Segurança: senhas guardadas só como hash BCrypt; o token leva o id, o perfil e uma versão que muda
+quando a senha é trocada ou redefinida (as sessões antigas caem na hora); perfil e existência do
+usuário são conferidos no banco a cada requisição. Para um sistema em produção, sirva o front e a API
+por HTTPS.
+
 ## Banco de dados (MySQL)
 
 O **cadastro dos dispositivos** (nome, local, canal do ThingSpeak, fields, conversões) e as
-**solicitações de manutenção** ficam no banco (tabelas `devices` e `maintenance_requests`). As
+**solicitações de manutenção** ficam no banco (tabelas `devices` e `maintenance_requests`), assim como os **usuários** (`app_users`). As
 **leituras** não: vêm do ThingSpeak em tempo real.
 
 - O banco `ecosense` e as tabelas são **criados sozinhos** na primeira execução (Hibernate `ddl-auto: update`).
@@ -140,19 +164,22 @@ do ThingSpeak para 10 dispositivos de teste.
 | Previsão de autonomia | Tendência linear da bateria nos últimos 7 dias + saldo energético (coleta − consumo) no mesmo período. Queda → dias até zerar; estável/subindo com saldo ≥ 0 → sustentável; estável/subindo com saldo < 0 → "saldo negativo" (sem número de dias, pois a capacidade em Wh não é conhecida). A confiança cai com oscilação da bateria, falta de dados e quando bateria e saldo se contradizem. |
 | Alertas | Offline, bateria < 20 %, esgotando em ≤ 3 dias, consumo > 1,5× a média de 7 dias, geração < 70 % da de ontem. |
 | Cadastro de dispositivos | Banco (tabela `devices`), com cópia em memória recarregada a cada alteração. |
-| Manutenção | Banco (tabela `maintenance_requests`). |
+| Manutenção | Banco (tabela `maintenance_requests`), com quem pediu. |
+| Usuários | Banco (tabela `app_users`), senha em hash BCrypt. |
 
 ## Estrutura
 
 ```
 src/main/java/br/com/ecosense/
-├── config/       EcoSenseProperties (application.yml), CORS, Clock
-├── persistence/  Entidades JPA e repositórios: DeviceEntity, MaintenanceRequestEntity
+├── config/       EcoSenseProperties e AuthProperties (application.yml), CORS, Clock
+├── security/     SecurityConfig (regras por perfil), TokenService (JWT), AuthUser
+├── persistence/  Entidades JPA e repositórios: DeviceEntity, MaintenanceRequestEntity, UserEntity
 ├── thingspeak/   ThingSpeakClient e HttpThingSpeakClient (API REST do ThingSpeak)
 ├── service/      DeviceCatalog (cadastro no banco), ReadingService (cache), DeviceService,
 │                 ForecastService, HistoryService, EnergyService (visão geral, fontes, cargas,
-│                 baterias, alertas), MaintenanceService
-└── api/          ApiController (/api/...), DeviceAdminController (cadastro), ApiDtos, erros
+│                 baterias, alertas), MaintenanceService, UserService (login, conta, usuários)
+└── api/          ApiController (/api/...), DeviceAdminController (cadastro), AuthController
+                  (login e conta), UserAdminController (usuários), ApiDtos, erros
 
 src/test/
 ├── java/.../thingspeak/SimulatedThingSpeakClient.java   leituras simuladas (só testes)

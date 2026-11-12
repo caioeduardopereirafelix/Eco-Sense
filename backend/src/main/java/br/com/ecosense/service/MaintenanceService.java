@@ -17,6 +17,7 @@ import br.com.ecosense.api.ApiException;
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.persistence.MaintenanceRequestEntity;
 import br.com.ecosense.persistence.MaintenanceRequestRepository;
+import br.com.ecosense.security.AuthUser;
 
 /** Solicitações de manutenção, guardadas no banco (tabela maintenance_requests). */
 @Service
@@ -37,12 +38,15 @@ public class MaintenanceService {
         this.clock = clock;
     }
 
-    public List<MaintenanceRequest> list() {
-        return repository.findAllByOrderByIdAsc().stream().map(MaintenanceService::toDto).toList();
+    /** Administrador vê todos os pedidos; usuário comum, só os que ele mesmo fez. */
+    public List<MaintenanceRequest> list(AuthUser user) {
+        var all = user.isAdmin() ? repository.findAllByOrderByIdAsc()
+                : repository.findAllByRequestedByIdOrderByIdAsc(user.id());
+        return all.stream().map(MaintenanceService::toDto).toList();
     }
 
     @Transactional
-    public MaintenanceRequest create(NewMaintenanceRequest body) {
+    public MaintenanceRequest create(NewMaintenanceRequest body, AuthUser user) {
         devices.config(body.deviceId()); // 404 se o dispositivo não existir
         MaintenanceRequestEntity e = new MaintenanceRequestEntity();
         e.setDeviceId(body.deviceId());
@@ -50,6 +54,8 @@ public class MaintenanceService {
         e.setNote(body.note() == null ? "" : body.note().trim());
         e.setStatus("Recebida");
         e.setCreatedAt(Instant.now(clock).truncatedTo(ChronoUnit.SECONDS));
+        e.setRequestedById(user.id());
+        e.setRequestedByName(user.name());
         return toDto(repository.save(e));
     }
 
@@ -78,7 +84,7 @@ public class MaintenanceService {
 
     private static MaintenanceRequest toDto(MaintenanceRequestEntity e) {
         return new MaintenanceRequest(e.getId(), e.getDeviceId(), e.getReason(), e.getNote(),
-                e.getStatus(), e.getCreatedAt(), e.getScheduledFor());
+                e.getStatus(), e.getCreatedAt(), e.getScheduledFor(), e.getRequestedByName());
     }
 
     private static LocalDate parseDay(String value) {

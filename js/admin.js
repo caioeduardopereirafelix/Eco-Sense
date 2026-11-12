@@ -52,6 +52,7 @@ async manutencao(){
    </div>
    <dl class="kv">
     <dt>Motivo</dt><dd>${esc(r.reason||'Não informado')}</dd>
+    <dt>Pedido por</dt><dd>${esc(r.requestedBy||'—')}</dd>
     <dt>Observação</dt><dd>${esc(r.note||'—')}</dd>
     <dt>Visita</dt><dd>${r.scheduledFor?formatDay(r.scheduledFor):'Não agendada'}</dd>
     ${risk?`<dt>Risco do dispositivo</dt><dd>${risk.label}</dd>`:''}
@@ -294,9 +295,92 @@ async alertas(){const a=await api.getAlerts();
  const draw=()=>{V.innerHTML=a.length?withRead(a).map(alertHTML).join(''):'<div class="card mu">Nenhum alerta no momento.</div>'};
  V.onclick=e=>{const b=e.target.closest('[data-read]');if(b){readIds.add(b.dataset.read);draw()}};
  draw()},
-async configuracoes(){V.innerHTML=`<div class="card" style="max-width:640px">
+async usuarios(notice=''){
+ const users=await api.getUsers();
+ const meId=auth.get().user.id;
+ let form=null; /* null | {mode:'new'|'edit'|'reset', u: usuário, error} */
+ const roleTag=r=>`<span class="tag s-${r==='ADMIN'?'Alta':'Normal'}">${auth.roleLabel(r)}</span>`;
+ const day=iso=>iso?new Date(iso).toLocaleDateString('pt-BR'):'—';
+ const roleSelect=(role,disabled)=>`<select name="role"${disabled?' disabled':''}>${[['USER','Usuário'],['ADMIN','Administrador']].map(([v,l])=>`<option value="${v}"${v===role?' selected':''}>${l}</option>`).join('')}</select>`;
+ const userForm=({mode,u,error})=>{
+  const self=u.id===meId;
+  const fields=mode==='reset'
+   ?`<label>Nova senha<input name="password" type="password" autocomplete="new-password" maxlength="72" placeholder="mínimo 8 caracteres"></label>`
+   :`<label>Nome *<input name="name" value="${esc(u.name||'')}" maxlength="80"></label>
+     <label>E-mail *<input name="email" type="email" value="${esc(u.email||'')}" maxlength="120"></label>
+     <label>Perfil${roleSelect(u.role||'USER',mode==='edit'&&self)}</label>
+     ${mode==='new'?'<label>Senha inicial *<input name="password" type="password" autocomplete="new-password" maxlength="72" placeholder="mínimo 8 caracteres"></label>':''}`;
+  const title=mode==='new'?'Novo usuário':mode==='edit'?`Editar ${esc(u.name)}`:`Redefinir a senha de ${esc(u.name)}`;
+  const hint=mode==='new'?'Informe a senha inicial ao usuário; ele pode trocá-la em Minha conta.'
+   :mode==='reset'?'Use quando o usuário esquecer a senha. As sessões abertas dele serão encerradas.'
+   :self?'Você não pode alterar o seu próprio perfil.':'';
+  return`<form class="card" id="userform" style="margin-bottom:16px" novalidate>
+   <h3>${title}</h3>${hint?`<div class="mu" style="font-size:13px;margin-bottom:10px">${hint}</div>`:''}
+   <div class="form-grid">${fields}</div>
+   <div role="alert" class="form-err">${esc(error||'')}</div>
+   <div class="row" style="margin:8px 0 0"><button class="btn on" type="submit">Salvar</button><button class="btn" type="button" data-cancel="1">Cancelar</button></div>
+  </form>`};
+ const row=u=>`<tr><td>${esc(u.name)}${u.id===meId?' <span class="mu">(você)</span>':''}</td><td>${esc(u.email)}</td><td>${roleTag(u.role)}</td><td>${day(u.createdAt)}</td>
+  <td><div class="card-actions" style="margin:0;justify-content:flex-end"><button class="btn" data-edit="${u.id}">Editar</button><button class="btn" data-pwd="${u.id}">Senha</button>${u.id===meId?'':`<button class="btn danger" data-del="${u.id}">Remover</button>`}</div></td></tr>`;
+ const draw=()=>{
+  const admins=users.filter(u=>u.role==='ADMIN').length;
+  V.innerHTML=`${notice?`<div class="banner" role="status">${esc(notice)}</div>`:''}
+   <div class="row"><span class="mu">${users.length} ${users.length===1?'usuário':'usuários'} · ${admins} ${admins===1?'administrador':'administradores'}</span><button class="btn on" data-new="1" style="margin-left:auto">+ Novo usuário</button></div>
+   ${form?userForm(form):''}
+   <div class="card"><div class="tw"><table><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Criado em</th><th></th></tr>${users.map(row).join('')}</table></div>
+   <div class="mu" style="margin-top:10px;font-size:13px">Administradores acessam este painel; usuários, só o portal do usuário.</div></div>`;
+  if(form)$('#userform').scrollIntoView({block:'start'});
+ };
+ const byUserId=id=>users.find(u=>String(u.id)===String(id));
+ V.onclick=async e=>{
+  const t=e.target.closest('[data-new],[data-edit],[data-pwd],[data-del],[data-cancel]');if(!t)return;
+  notice='';
+  if(t.dataset.new)form={mode:'new',u:{role:'USER'}};
+  else if(t.dataset.edit)form={mode:'edit',u:byUserId(t.dataset.edit)};
+  else if(t.dataset.pwd)form={mode:'reset',u:byUserId(t.dataset.pwd)};
+  else if(t.dataset.cancel)form=null;
+  else if(t.dataset.del){
+   const u=byUserId(t.dataset.del);
+   if(!confirm(`Remover o usuário "${u.name}" (${u.email})?
+
+Ele perde o acesso imediatamente.`))return;
+   try{await api.deleteUser(u.id);await pages.usuarios(`Usuário ${u.name} removido.`);return}
+   catch(err){notice=`Não foi possível remover: ${err.message}`}
+  }
+  draw()};
+ const submit=V.onsubmit=async e=>{
+  if(e.target.getAttribute('id')!=='userform')return;
+  e.preventDefault();
+  const el=e.target,v=n=>el.elements[n]?el.elements[n].value.trim():'';
+  const btn=el.querySelector('[type=submit]');
+  const fail=m=>{form.error=m;draw()};
+  const password=el.elements.password?el.elements.password.value:'';
+  if(form.mode!=='reset'){
+   form.u={...form.u,name:v('name'),email:v('email'),role:el.elements.role.value};
+   if(!form.u.name||!form.u.email)return fail('Informe o nome e o e-mail.');
+  }
+  if(form.mode!=='edit'&&password.length<8)return fail('A senha deve ter pelo menos 8 caracteres.');
+  btn.disabled=true;btn.textContent='Salvando…';
+  try{
+   const {name,email,role}=form.u;
+   if(form.mode==='new'){await api.createUser({name,email,role,password});await pages.usuarios(`Usuário ${name} criado.`)}
+   else if(form.mode==='edit'){
+    const saved=await api.updateUser(form.u.id,{name,email,role});
+    if(saved.id===meId){auth.setUser(saved);showWho()}
+    await pages.usuarios(`Usuário ${saved.name} atualizado.`)}
+   else{await api.resetUserPassword(form.u.id,password);await pages.usuarios(`Senha de ${form.u.name} redefinida.`)}
+  }catch(err){fail(err.message)}
+ };
+ onLeave(()=>{if(V.onsubmit===submit)V.onsubmit=null});
+ draw()},
+async configuracoes(){
+ const me=await api.getMe();
+ V.innerHTML=`${accountCards(me)}
+ <div class="card" style="max-width:640px">
+ <h3>Alertas</h3>
  ${[['Alertas de bateria crítica',1],['Alertas de consumo elevado',1],['Alertas por e-mail',0]].map(([n,o])=>`<div class="set"><b>${n}</b><button class="sw${o?' on':''}" aria-label="${n}" onclick="this.classList.toggle('on')"></button></div>`).join('')}
- </div>`}
+ </div>`;
+ bindAccount()}
 };
-const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['configuracoes','Configurações']];
-startApp(NAV,pages,{staticPages:['configuracoes']});
+const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['usuarios','Usuários'],['configuracoes','Configurações']];
+startApp(NAV,pages,{staticPages:['configuracoes'],role:'ADMIN'});

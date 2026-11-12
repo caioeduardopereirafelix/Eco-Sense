@@ -34,6 +34,14 @@ spring:
       hibernate.jdbc.time_zone: UTC
 
 ecosense:
+  # Login (perfis ADMIN e USER). Segredos no .env, nunca aqui.
+  auth:
+    jwt-secret: ${JWT_SECRET:}                     # vazio = chave aleatória (logins caem ao reiniciar)
+    token-ttl: 8h
+    # primeiro administrador, criado só quando ainda não há nenhum usuário no banco
+    admin-email: ${ECOSENSE_ADMIN_EMAIL:admin@ecosense.local}
+    admin-name: Administrador
+    admin-password: ${ECOSENSE_ADMIN_PASSWORD:}   # vazio = senha aleatória mostrada no log
   thingspeak:
     base-url: https://api.thingspeak.com
     # Read API Key padrão (canais privados). Defina THINGSPEAK_READ_API_KEY no .env; vazio = só canais públicos.

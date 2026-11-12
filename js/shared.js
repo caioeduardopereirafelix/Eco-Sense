@@ -86,11 +86,23 @@ const unsaved=()=>[...V.querySelectorAll('input,select,textarea')].some(el=>{
 const updatedText=t=>{const s=Math.round((Date.now()-t)/1000);
  return s<10?'Atualizado agora':s<60?`Atualizado há ${s - s%5} s`:`Atualizado há ${Math.floor(s/60)} min`};
 
+/* nome do usuário logado no cabeçalho ("Ana · Administrador") */
+function showWho(){const s=auth.get(),el=$('#who');if(!s||!el)return;
+ const label=auth.roleLabel(s.user.role);
+ el.textContent=s.user.role==='ADMIN'&&s.user.name!==label?`${s.user.name} · ${label}`:s.user.name;
+ el.title=s.user.email}
+
 /* Monta navegação, tema e roteamento por hash. NAV = [[chave,título],...]; pages = {chave: async()=>{}}
-   staticPages: telas sem dados da API (configurações, conta), que não são atualizadas sozinhas */
-function startApp(NAV,pages,{staticPages=[]}={}){
+   staticPages: telas sem dados da API (configurações, conta), que não são atualizadas sozinhas
+   role: 'ADMIN' exige perfil de administrador; sem role, basta estar logado */
+function startApp(NAV,pages,{staticPages=[],role}={}){
+ const session=auth.require(role);
+ if(!session)return; /* indo para o login (ou para o portal certo do perfil) */
  $('#nav').innerHTML=NAV.map(([k,n])=>`<a href="#${k}" data-k="${k}">${n}</a>`).join('');
  $('#theme').insertAdjacentHTML('beforebegin','<span class="upd mu" id="upd" role="status" aria-live="off"></span>');
+ $('#theme').insertAdjacentHTML('afterend','<button class="pill" id="logout" title="Encerrar a sessão">Sair</button>');
+ $('#logout').onclick=()=>auth.logout();
+ showWho();
  /* Navegação concorrente: cada go() ganha um número. As chamadas à api feitas por uma tela que
     já foi abandonada nunca resolvem, então ela não chega a sobrescrever a tela atual. */
  let navToken=0;

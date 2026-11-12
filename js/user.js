@@ -4,13 +4,12 @@
    Funções de administração (cadastro/configuração de dispositivos, roteirização e agenda de
    manutenção, parâmetros do sistema) ficam no painel /admin. */
 
-/* ---------- preferências do usuário (salvas no navegador) ---------- */
+/* ---------- preferências de notificação (salvas neste navegador; nome e e-mail vêm do login) ---------- */
 const PREF_KEY='eh-user-prefs';
-const DEFAULT_PREFS={name:'Usuário Demo',email:'usuario@exemplo.com',limit:300,critical:true,high:true,mail:false};
+const DEFAULT_PREFS={limit:300,critical:true,high:true,mail:false};
 function loadPrefs(){try{return{...DEFAULT_PREFS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')}}catch(e){return{...DEFAULT_PREFS}}}
 function savePrefs(p){try{localStorage.setItem(PREF_KEY,JSON.stringify(p));return true}catch(e){return false}}
 let prefs=loadPrefs();
-const updateWho=()=>{$('#who').textContent=prefs.name};
 
 /* ---------- alertas do usuário: respeitam as notificações e o limite de consumo ---------- */
 let alertsBase=null;
@@ -123,33 +122,24 @@ async alertas(){
  bindAlerts(draw);await draw()},
 
 async conta(){
+ const me=await api.getMe();
  const p={...prefs};
  const sw=(k,label,desc)=>`<div class="set"><div><b>${label}</b><div class="mu">${desc}</div></div><button class="sw${p[k]?' on':''}" data-pref="${k}" role="switch" aria-checked="${!!p[k]}" aria-label="${label}"></button></div>`;
- V.innerHTML=`<div class="card" style="max-width:640px">
-  <h3>Perfil</h3>
-  <div class="set"><label for="uname"><b>Nome</b></label><input id="uname" type="text" value="${esc(p.name)}" maxlength="60"></div>
-  <div class="set"><label for="umail"><b>E-mail</b></label><input id="umail" type="email" value="${esc(p.email)}" maxlength="80"></div>
-  <h3 style="margin-top:20px">Notificações</h3>
+ V.innerHTML=`${accountCards(me)}
+  <div class="card" style="max-width:640px">
+  <h3>Notificações</h3>
+  <div class="mu" style="font-size:13px">Preferências salvas neste navegador.</div>
   ${sw('critical','Bateria crítica','Avisar quando um dispositivo estiver com bateria muito baixa')}
   ${sw('high','Consumo elevado','Avisar quando o consumo passar do seu limite')}
-  ${sw('mail','Receber alertas por e-mail','Enviar um resumo para o e-mail acima')}
+  ${sw('mail','Receber alertas por e-mail',`Enviar um resumo para ${esc(me.email)}`)}
   <div class="set"><div><b>Limite de consumo</b><div class="mu">Alerta acima de <span id="limv">${p.limit}</span> W</div></div><input id="limr" type="range" min="100" max="600" step="10" value="${p.limit}" aria-label="Limite de consumo em watts"></div>
-  <div id="cerr" role="alert" style="color:var(--cr);min-height:20px;margin-top:12px;font-size:13px"></div>
-  <div class="row" style="margin:8px 0 0"><button class="btn on" id="csave">Salvar alterações</button><span class="mu" id="cok" role="status"></span></div></div>`;
- const clear=()=>{$('#cerr').textContent='';$('#cok').textContent=''};
- V.onclick=e=>{const b=e.target.closest('[data-pref]');if(!b)return;const k=b.dataset.pref;p[k]=!p[k];b.classList.toggle('on',p[k]);b.setAttribute('aria-checked',String(p[k]));clear()};
- $('#limr').oninput=e=>{p.limit=+e.target.value;$('#limv').textContent=p.limit;clear()};
- $('#uname').oninput=clear;$('#umail').oninput=clear;
- $('#csave').onclick=()=>{
-  const name=$('#uname').value.trim(),mail=$('#umail').value.trim();
-  if(!name){$('#cerr').textContent='Informe seu nome.';return}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)){$('#cerr').textContent='Informe um e-mail válido.';return}
-  p.name=name;p.email=mail;prefs=p;
-  const saved=savePrefs(p);updateWho();
-  $('#cerr').textContent='';
-  $('#cok').textContent=saved?'Alterações salvas.':'Alterações aplicadas nesta sessão (não foi possível salvar no navegador).'}}
+  <div class="row" style="margin:12px 0 0"><button class="btn on" id="csave">Salvar notificações</button><span class="mu" id="cok" role="status"></span></div></div>`;
+ bindAccount();
+ V.onclick=e=>{const b=e.target.closest('[data-pref]');if(!b)return;const k=b.dataset.pref;p[k]=!p[k];b.classList.toggle('on',p[k]);b.setAttribute('aria-checked',String(p[k]));$('#cok').textContent=''};
+ $('#limr').oninput=e=>{p.limit=+e.target.value;$('#limv').textContent=p.limit;$('#cok').textContent=''};
+ $('#csave').onclick=()=>{prefs=p;
+  $('#cok').textContent=savePrefs(p)?'Notificações salvas.':'Aplicadas nesta sessão (não foi possível salvar no navegador).'}}
 };
 
 const NAV=[['inicio','Início'],['dispositivos','Meus dispositivos'],['previsao','Previsão de bateria'],['energia','Minha energia'],['historico','Histórico'],['alertas','Alertas'],['conta','Minha conta']];
-updateWho();
 startApp(NAV,pages,{staticPages:['conta']});

@@ -146,3 +146,52 @@ async function renderForecast({detailed=false}={}){
  $('#pdev').onchange=e=>{st.sel=e.target.value;drawCharts()};
  V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){st.sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
  drawRange();await drawCharts()}
+
+/* ---------- minha conta: nome e troca de senha (usuário e admin) ---------- */
+/* HTML dos cards; depois de inserir na tela, chame bindAccount(). me = resposta de api.getMe() */
+const accountCards=me=>`<div class="card" style="max-width:640px;margin-bottom:16px">
+  <h3>Meu perfil</h3>
+  <div class="set"><label for="acname"><b>Nome</b></label><input id="acname" type="text" value="${esc(me.name)}" maxlength="80"></div>
+  <div class="set"><div><b>E-mail</b><div class="mu">Usado para entrar · só um administrador pode alterar</div></div><span>${esc(me.email)}</span></div>
+  <div class="set" style="border:0"><b>Perfil</b><span class="tag s-${me.role==='ADMIN'?'Alta':'Normal'}">${auth.roleLabel(me.role)}</span></div>
+  <div id="acerr" role="alert" class="form-err"></div>
+  <div class="row" style="margin:4px 0 0"><button class="btn on" id="acsave">Salvar nome</button><span class="mu" id="acok" role="status"></span></div></div>
+ <form class="card" id="pwform" style="max-width:640px;margin-bottom:16px" novalidate>
+  <h3>Alterar senha</h3>
+  <div class="form-grid">
+   <label>Senha atual<input name="current" type="password" autocomplete="current-password" maxlength="72"></label>
+   <label>Nova senha<input name="next" type="password" autocomplete="new-password" maxlength="72" placeholder="mínimo 8 caracteres"></label>
+   <label>Repita a nova senha<input name="confirm" type="password" autocomplete="new-password" maxlength="72"></label>
+  </div>
+  <div id="pwerr" role="alert" class="form-err"></div>
+  <div class="row" style="margin:4px 0 0"><button class="btn on" type="submit">Alterar senha</button><span class="mu" id="pwok" role="status"></span></div>
+  <div class="mu" style="font-size:13px">Ao trocar a senha, as sessões abertas em outros navegadores são encerradas.</div>
+ </form>`;
+function bindAccount(){
+ $('#acname').oninput=()=>{$('#acerr').textContent='';$('#acok').textContent=''};
+ $('#acsave').onclick=async e=>{
+  const name=$('#acname').value.trim();
+  $('#acok').textContent='';
+  if(!name){$('#acerr').textContent='Informe seu nome.';return}
+  e.target.disabled=true;
+  try{const me=await api.updateMe(name);auth.setUser(me);showWho();
+   $('#acname').defaultValue=me.name;$('#acerr').textContent='';$('#acok').textContent='Nome salvo.'}
+  catch(err){$('#acerr').textContent=err.message}
+  e.target.disabled=false};
+ const form=$('#pwform');
+ form.oninput=()=>{$('#pwerr').textContent='';$('#pwok').textContent=''};
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  const current=form.current.value,next=form.next.value,confirm=form.confirm.value;
+  const fail=m=>{$('#pwerr').textContent=m;$('#pwok').textContent=''};
+  $('#pwerr').textContent='';$('#pwok').textContent='';
+  if(!current||!next)return fail('Informe a senha atual e a nova senha.');
+  if(next.length<8)return fail('A nova senha deve ter pelo menos 8 caracteres.');
+  if(next!==confirm)return fail('A confirmação não confere com a nova senha.');
+  const btn=form.querySelector('[type=submit]');btn.disabled=true;
+  try{
+   auth.save(await api.changePassword(current,next)); /* token novo: esta sessão continua */
+   form.reset();$('#pwok').textContent='Senha alterada.'}
+  catch(err){fail(err.message)}
+  btn.disabled=false};
+}

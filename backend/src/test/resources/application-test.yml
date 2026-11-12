@@ -10,6 +10,11 @@ spring:
     password:
 
 ecosense:
+  auth:
+    # chave e senha fixas SÓ para os testes automáticos
+    jwt-secret: chave-de-teste-com-mais-de-32-caracteres-0123456789
+    admin-email: admin@teste.local
+    admin-password: senha-admin-teste
   thingspeak:
     read-api-key:
     simulate: true

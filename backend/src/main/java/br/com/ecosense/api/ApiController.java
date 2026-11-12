@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +30,7 @@ import br.com.ecosense.api.ApiDtos.MaintenanceUpdate;
 import br.com.ecosense.api.ApiDtos.NewMaintenanceRequest;
 import br.com.ecosense.api.ApiDtos.Overview;
 import br.com.ecosense.api.ApiDtos.Source;
+import br.com.ecosense.security.AuthUser;
 import br.com.ecosense.service.DeviceService;
 import br.com.ecosense.service.EnergyService;
 import br.com.ecosense.service.ForecastService;
@@ -109,14 +111,15 @@ public class ApiController {
     }
 
     @GetMapping("/maintenance-requests")
-    public List<MaintenanceRequest> maintenanceRequests() {
-        return maintenance.list();
+    public List<MaintenanceRequest> maintenanceRequests(@AuthenticationPrincipal AuthUser user) {
+        return maintenance.list(user);
     }
 
     @PostMapping("/maintenance-requests")
     @ResponseStatus(HttpStatus.CREATED)
-    public MaintenanceRequest requestMaintenance(@Valid @RequestBody NewMaintenanceRequest body) {
-        return maintenance.create(body);
+    public MaintenanceRequest requestMaintenance(@AuthenticationPrincipal AuthUser user,
+                                                 @Valid @RequestBody NewMaintenanceRequest body) {
+        return maintenance.create(body, user);
     }
 
     @PatchMapping("/maintenance-requests/{id}")

@@ -7,6 +7,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -57,8 +58,10 @@ public final class ApiDtos {
     public record History(String step, List<Instant> timestamps,
                           List<Double> generatedKwh, List<Double> consumedKwh, List<Double> storagePct) {}
 
+    /** requestedBy: nome de quem pediu (null em pedidos antigos, anteriores ao login) */
     public record MaintenanceRequest(long id, String deviceId, String reason, String note,
-                                     String status, Instant createdAt, LocalDate scheduledFor) {}
+                                     String status, Instant createdAt, LocalDate scheduledFor,
+                                     String requestedBy) {}
 
     public record NewMaintenanceRequest(
             @NotBlank(message = "Informe o dispositivo.") String deviceId,
@@ -71,6 +74,44 @@ public final class ApiDtos {
             String scheduledFor) {}
 
     public record ErrorBody(String message) {}
+
+    /* ---------------- login, conta e usuários ---------------- */
+
+    public record LoginRequest(
+            @NotBlank(message = "Informe o e-mail.") String email,
+            @NotBlank(message = "Informe a senha.") String password) {}
+
+    /** role: ADMIN | USER */
+    public record UserInfo(long id, String name, String email, String role, Instant createdAt) {}
+
+    /** Resposta do login (e da troca de senha, que gera um token novo). */
+    public record Session(String token, Instant expiresAt, UserInfo user) {}
+
+    public record ProfileUpdate(
+            @NotBlank(message = "Informe o nome.") @Size(max = 80, message = "O nome deve ter até 80 caracteres.") String name) {}
+
+    public record PasswordChange(
+            @NotBlank(message = "Informe a senha atual.") String currentPassword,
+            @NotBlank(message = "Informe a nova senha.")
+            @Size(min = 8, max = 72, message = "A nova senha deve ter de 8 a 72 caracteres.") String newPassword) {}
+
+    public record NewUser(
+            @NotBlank(message = "Informe o nome.") @Size(max = 80, message = "O nome deve ter até 80 caracteres.") String name,
+            @NotBlank(message = "Informe o e-mail.") @Email(message = "Informe um e-mail válido.")
+            @Size(max = 120, message = "O e-mail deve ter até 120 caracteres.") String email,
+            @NotBlank(message = "Informe o perfil.") @Pattern(regexp = "ADMIN|USER", message = "Perfil inválido (use ADMIN ou USER).") String role,
+            @NotBlank(message = "Informe a senha inicial.")
+            @Size(min = 8, max = 72, message = "A senha deve ter de 8 a 72 caracteres.") String password) {}
+
+    public record UserUpdate(
+            @NotBlank(message = "Informe o nome.") @Size(max = 80, message = "O nome deve ter até 80 caracteres.") String name,
+            @NotBlank(message = "Informe o e-mail.") @Email(message = "Informe um e-mail válido.")
+            @Size(max = 120, message = "O e-mail deve ter até 120 caracteres.") String email,
+            @NotBlank(message = "Informe o perfil.") @Pattern(regexp = "ADMIN|USER", message = "Perfil inválido (use ADMIN ou USER).") String role) {}
+
+    public record PasswordReset(
+            @NotBlank(message = "Informe a nova senha.")
+            @Size(min = 8, max = 72, message = "A senha deve ter de 8 a 72 caracteres.") String password) {}
 
     /* ---------------- cadastro de dispositivos (admin) ---------------- */
 

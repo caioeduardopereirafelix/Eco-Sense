@@ -28,13 +28,58 @@ Sensores IoT ──▶ ThingSpeak (canais/fields) ──▶ Back-end Java ──
 | Datas sem hora (agendamento) | `"2026-11-21"` |
 | Valor ausente | `null` (não omitir o campo, não usar `""`) |
 | Erros | HTTP 4xx/5xx com `{"message": "texto para o usuário"}` |
+| Autenticação | `Authorization: Bearer <token>` em toda chamada, exceto o login |
 
 Status exibidos como tag usam estes valores (texto em português, também usados como classe CSS):
 `Normal`, `Atenção`, `Crítico`, `Carregando`, `Online`, `Offline`.
 
+## Login e perfis
+
+Dois perfis: **ADMIN** (painel `/admin` e portal do usuário) e **USER** (só o portal do usuário).
+O front guarda a sessão (js/auth.js) e envia o token em toda chamada. Respostas de acesso:
+
+| Situação | Resposta |
+|---|---|
+| Sem token, token inválido/expirado, senha trocada ou usuário removido | `401 {"message": "Faça login para continuar."}` → o front volta para `login.html` |
+| USER chamando rota de administrador | `403 {"message": "Acesso restrito a administradores."}` |
+
+**Só ADMIN:** `/api/users/**`, `/api/thingspeak/**`, `GET /api/devices/{id}/settings`,
+`POST /api/devices`, `PUT`/`DELETE /api/devices/{id}` e `PATCH /api/maintenance-requests/{id}`.
+Todo o resto de `/api/**` vale para qualquer usuário logado.
+
+`POST /api/auth/login` (público) → `api.login(email, password)`
+```json
+// corpo
+{ "email": "ana@exemplo.com", "password": "…" }
+// resposta
+{ "token": "eyJhbGciOiJIUzI1NiJ9…", "expiresAt": "2026-11-12T22:00:00Z",
+  "user": { "id": 1, "name": "Ana", "email": "ana@exemplo.com", "role": "ADMIN", "createdAt": "2026-11-12T14:00:00Z" } }
+```
+E-mail ou senha errados: `401 {"message": "E-mail ou senha incorretos."}`. O token vale 8 h.
+
+**Minha conta** (qualquer perfil)
+
+| Método | Rota | Front | Corpo / resposta |
+|---|---|---|---|
+| GET | `/api/me` | `api.getMe()` | o `user` acima |
+| PUT | `/api/me` | `api.updateMe(name)` | `{ "name": "…" }` → `user` |
+| PUT | `/api/me/password` | `api.changePassword(atual, nova)` | `{ "currentPassword", "newPassword" }` (8–72 caracteres) → sessão nova (mesmo formato do login). Encerra as outras sessões. |
+
+**Usuários** (só ADMIN)
+
+| Método | Rota | Front | Corpo / resposta |
+|---|---|---|---|
+| GET | `/api/users` | `api.getUsers()` | lista de `user` |
+| POST | `/api/users` | `api.createUser(u)` | `{ "name", "email", "role": "ADMIN"|"USER", "password" }` → 201 `user` (e-mail repetido: 409) |
+| PUT | `/api/users/{id}` | `api.updateUser(id, u)` | `{ "name", "email", "role" }` → `user` |
+| PUT | `/api/users/{id}/password` | `api.resetUserPassword(id, senha)` | `{ "password" }` → 204; encerra as sessões do usuário |
+| DELETE | `/api/users/{id}` | `api.deleteUser(id)` | 204 |
+
+O administrador não pode remover a si mesmo nem mudar o próprio perfil (assim sempre resta um ADMIN).
+
 ## Endpoints
 
-Todos implementados em `backend/` (`ApiController`).
+Todos implementados em `backend/` (`ApiController`). Exigem login (ver acima).
 
 ### `GET /api/overview` → `api.getOverview()`
 ```json
@@ -173,14 +218,16 @@ calculados no back-end.
 `GET /api/maintenance-requests` → `api.getMaintenanceRequests()`
 ```json
 [{ "id": 1, "deviceId": "IOT-007", "reason": "Dispositivo offline", "note": "", "status": "Recebida",
-   "createdAt": "2026-10-15T12:00:00Z", "scheduledFor": null }]
+   "createdAt": "2026-10-15T12:00:00Z", "scheduledFor": null, "requestedBy": "Ana" }]
 ```
 `status`: `Recebida` | `Agendada` | `Em rota` | `Concluída`. `scheduledFor`: `AAAA-MM-DD` ou `null`.
+`requestedBy`: nome de quem pediu, no momento do pedido (`null` em pedidos anteriores ao login).
+ADMIN recebe todos os pedidos; USER, só os próprios.
 
 `POST /api/maintenance-requests` → `api.requestMaintenance(deviceId, {reason, note})`
 corpo `{ "deviceId": "IOT-007", "reason": "…", "note": "…" }`; responde com a solicitação criada.
 
-`PATCH /api/maintenance-requests/{id}` → `api.updateMaintenanceRequest(id, {status, scheduledFor})`
+`PATCH /api/maintenance-requests/{id}` (só ADMIN) → `api.updateMaintenanceRequest(id, {status, scheduledFor})`
 corpo `{ "status": "Agendada", "scheduledFor": "2026-11-21" }`; responde com a solicitação atualizada.
 Regras (validadas no back-end): `scheduledFor` vazio mantém a data atual;
 voltar para `Recebida` limpa a data; `Agendada` exige data válida e não passada.

@@ -8,22 +8,29 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.WebApplicationContext;
 
 /** Cadastro de dispositivos no banco (H2 em memória, modo simulado). */
 @SpringBootTest
 @ActiveProfiles("test")
-@AutoConfigureMockMvc
 class DeviceAdminControllerTest {
 
     @Autowired
+    WebApplicationContext ctx;
+    /* todas as requisições vão com o token do administrador */
     MockMvc mvc;
+
+    @BeforeEach
+    void login() throws Exception {
+        mvc = TestAuth.asAdmin(ctx);
+    }
 
     private static final String NEW_DEVICE = """
             {"id":"TEST-01","name":"Sensor de teste","location":"Bancada","region":"Laboratório",

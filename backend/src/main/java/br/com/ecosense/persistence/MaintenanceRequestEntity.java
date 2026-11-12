@@ -29,6 +29,10 @@ public class MaintenanceRequestEntity {
     @Column(nullable = false)
     private Instant createdAt;
     private LocalDate scheduledFor;
+    /** quem pediu (null em pedidos anteriores ao login) */
+    private Long requestedById;
+    @Column(length = 80)
+    private String requestedByName;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -44,4 +48,8 @@ public class MaintenanceRequestEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public LocalDate getScheduledFor() { return scheduledFor; }
     public void setScheduledFor(LocalDate scheduledFor) { this.scheduledFor = scheduledFor; }
+    public Long getRequestedById() { return requestedById; }
+    public void setRequestedById(Long requestedById) { this.requestedById = requestedById; }
+    public String getRequestedByName() { return requestedByName; }
+    public void setRequestedByName(String requestedByName) { this.requestedByName = requestedByName; }
 }

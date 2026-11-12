@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EcoSense · Entrar</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="login-page">
+<main class="login-wrap">
+ <form class="card login-card" id="login" novalidate>
+  <div class="logo" style="padding:0 0 6px"><i></i>EcoSense</div>
+  <h1 class="login-title">Entrar</h1>
+  <p class="mu" style="margin:0 0 16px">Monitoramento de energia dos seus dispositivos IoT.</p>
+  <label for="email">E-mail</label>
+  <input id="email" name="email" type="email" autocomplete="username" required maxlength="120">
+  <label for="password">Senha</label>
+  <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="72">
+  <div id="err" role="alert" class="login-err"></div>
+  <button class="btn on" type="submit" id="go">Entrar</button>
+  <p class="mu" style="margin:14px 0 0;font-size:13px">Não tem acesso? Peça a um administrador para criar o seu usuário.</p>
+ </form>
+</main>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/services/api.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>
