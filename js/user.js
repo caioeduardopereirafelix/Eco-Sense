@@ -34,6 +34,7 @@ const needsAttention=(d,f)=>d.status==='Offline'||d.battery<20||(f.daysLeft!=nul
 /* ---------- telas ---------- */
 const pages={
 async inicio(){
+ alertsBase=null; /* busca alertas novos a cada carga (inclusive na atualização automática) */
  const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje')]);
  const fById=byId(fc.items);
  const needs=devices.filter(d=>needsAttention(d,fById[d.id])),online=devices.filter(d=>d.status==='Online').length;
@@ -49,12 +50,14 @@ async inicio(){
   <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  const drawAlerts=async()=>{const l=await userAlerts();$('#recent').innerHTML=l.length?l.slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
- bindAlerts(drawAlerts);drawAlerts()},
+ bindAlerts(drawAlerts);await drawAlerts()},
 
 async dispositivos(){
  const [devices,fc,reqs]=await Promise.all([api.getDevices(),api.getForecasts(),api.getMaintenanceRequests()]);
  const fById=byId(fc.items);
- let filter='all',openForm=null,notice='';
+ /* filtro sobrevive à atualização automática (com o pedido de manutenção aberto ela fica pausada) */
+ const st=pageState({filter:'all'});
+ let openForm=null,notice='';
  const filterFns={all:()=>true,att:d=>needsAttention(d,fById[d.id]),on:d=>d.status==='Online',off:d=>d.status==='Offline'};
  const reqOf=id=>[...reqs].reverse().find(r=>r.deviceId===id&&r.status!=='Concluída');
  const card=d=>{
@@ -78,9 +81,9 @@ async dispositivos(){
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
    </dl>${action}</div>`};
  const draw=()=>{
-  const list=devices.filter(filterFns[filter]);
+  const list=devices.filter(filterFns[st.filter]);
   V.innerHTML=notice?`<div class="banner" role="status">${esc(notice)}</div>`:'';
-  V.append(filters([['all','Todos'],['att','Precisam de atenção'],['on','Online'],['off','Offline']],filter,k=>{filter=k;notice='';draw()}));
+  V.append(filters([['all','Todos'],['att','Precisam de atenção'],['on','Online'],['off','Offline']],st.filter,k=>{st.filter=k;notice='';draw()}));
   V.insertAdjacentHTML('beforeend',list.length?`<div class="grid">${list.map(card).join('')}</div>`:'<div class="card mu">Nenhum dispositivo neste filtro.</div>')};
  V.onclick=async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
@@ -112,11 +115,12 @@ async energia(){
 historico:()=>renderHistory(),
 
 async alertas(){
+ alertsBase=null;
  const draw=async()=>{
   const list=await userAlerts(),unread=list.filter(a=>!a.read).length;
   V.innerHTML=`<div class="row">${unread?'<button class="btn" data-readall="1">Marcar todos como lidos</button>':''}<span class="mu">${unread} ${unread===1?'não lido':'não lidos'}</span></div>`
    +(list.length?list.map(alertHTML).join(''):'<div class="card mu">Nenhum alerta no momento.</div>')};
- bindAlerts(draw);draw()},
+ bindAlerts(draw);await draw()},
 
 async conta(){
  const p={...prefs};
@@ -148,4 +152,4 @@ async conta(){
 
 const NAV=[['inicio','Início'],['dispositivos','Meus dispositivos'],['previsao','Previsão de bateria'],['energia','Minha energia'],['historico','Histórico'],['alertas','Alertas'],['conta','Minha conta']];
 updateWho();
-startApp(NAV,pages);
+startApp(NAV,pages,{staticPages:['conta']});

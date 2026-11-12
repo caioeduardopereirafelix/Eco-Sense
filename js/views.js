@@ -61,8 +61,11 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
  /* período personalizado: começa nos últimos 14 dias; o back-end guarda até 31 dias */
  const isoDay=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
  const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoDay(d)};
- const period={from:daysAgo(13),to:daysAgo(0)},minDay=daysAgo(30),maxDay=daysAgo(0);
+ /* período escolhido sobrevive à atualização automática */
+ const st=pageState({range:'hoje',period:{from:daysAgo(13),to:daysAgo(0)}});
+ const period=st.period,minDay=daysAgo(30),maxDay=daysAgo(0);
  const draw=async k=>{
+  st.range=k;
   let h=null,error='';
   try{h=await api.getHistory(k,k==='custom'?period:{})}
   catch(e){if(k!=='custom')throw e;error=e.message}
@@ -80,7 +83,7 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
   chart('c1','line',labels,[lineDataset('--gen','Gerada',e.gen)]);
   chart('c2','line',labels,[lineDataset('--con','Consumida',e.con)]);
   chart('c3','line',labels,[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})};
- await draw('hoje')}
+ await draw(st.range)}
 
 /* ---------- tela: previsão de bateria ----------
    detailed (admin): mostra ID, local, exposição solar e contexto sazonal */
@@ -95,7 +98,10 @@ async function renderForecast({detailed=false}={}){
  const first=rows.find(r=>r.f.daysLeft!=null);
  const suns=rows.map(r=>r.f.sunHours).filter(h=>h!=null);
  const avgSun=suns.length?num(+(suns.reduce((a,b)=>a+b,0)/suns.length).toFixed(1)):'—';
- let sel=(first||withReading[0]||rows[0]).d.id,range='24h',drawToken=0;
+ /* dispositivo e período escolhidos sobrevivem à atualização automática */
+ const st=pageState({sel:null,range:'24h'});
+ if(!withReading.some(r=>r.d.id===st.sel))st.sel=(first||withReading[0]||rows[0]).d.id;
+ let drawToken=0;
  const idSuffix=d=>detailed?` <span class="mu">${esc(d.id)}</span>`:'';
  const tr=({d,f})=>`<tr>
   <td>${esc(d.name)}${idSuffix(d)}</td>${detailed?`<td>${esc(d.location||'—')}</td>`:''}
@@ -112,7 +118,7 @@ async function renderForecast({detailed=false}={}){
    <div class="tw"><table class="${detailed?'pv':'pvu'}">${head}${rows.map(tr).join('')}</table></div>
    ${detailed?'':`<div class="mu" style="margin-top:10px">Estimativas atualizadas ${esc(timeAgo(fc.updatedAt))}.</div>`}</div>
   <div class="card" id="pcharts" style="margin-bottom:16px"><div class="row">
-   <select id="pdev" aria-label="Dispositivo">${withReading.map(r=>`<option value="${esc(r.d.id)}"${r.d.id===sel?' selected':''}>${esc(r.d.name)}${detailed?` · ${esc(r.d.id)}`:''}</option>`).join('')}</select>
+   <select id="pdev" data-live aria-label="Dispositivo">${withReading.map(r=>`<option value="${esc(r.d.id)}"${r.d.id===st.sel?' selected':''}>${esc(r.d.name)}${detailed?` · ${esc(r.d.id)}`:''}</option>`).join('')}</select>
    <span id="prange"></span></div>
    <div class="mu" id="pinfo" style="margin-bottom:12px"></div>
    <div class="grid g2" style="margin:0"><div><h3 class="mu" style="margin-bottom:8px">Consumo previsto × real (<span id="pcunit">Wh</span>)</h3><div class="chart"><canvas id="c1"></canvas></div></div>
@@ -124,19 +130,19 @@ async function renderForecast({detailed=false}={}){
   if(f.balanceWhDay!=null)parts.push(`saldo coleta − consumo: ${balanceText(f.balanceWhDay)} (7 dias)`);
   if(detailed)parts.push(f.sunHours==null?'sem geração solar':`exposição solar ${num(f.sunHours)} h/dia`,`estação: ${esc(fc.season)}`);
   return parts.join(' · ')};
- const drawRange=()=>{const r=$('#prange');r.innerHTML='';const f=filters([['24h','Próximas 24 h'],['7d','Próximos 7 dias']],range,k=>{range=k;drawRange();drawCharts()});f.style.margin='0';r.append(f)};
+ const drawRange=()=>{const r=$('#prange');r.innerHTML='';const f=filters([['24h','Próximas 24 h'],['7d','Próximos 7 dias']],st.range,k=>{st.range=k;drawRange();drawCharts()});f.style.margin='0';r.append(f)};
  const drawCharts=async()=>{
   const token=++drawToken;
-  const s=await api.getForecastSeries(sel,range);
+  const s=await api.getForecastSeries(st.sel,st.range);
   if(token!==drawToken)return;
   charts.forEach(c=>c.destroy());charts=[];
-  $('#pinfo').innerHTML=info(rows.find(x=>x.d.id===sel));
+  $('#pinfo').innerHTML=info(rows.find(x=>x.d.id===st.sel));
   const line=(c,label,data,dash)=>({borderColor:css(c),label,data,fill:false,borderDash:dash||[]});
   /* rótulos relativos ao agora: "−3h", "agora", "+2d" */
   const labels=s.timestamps.map((_,i)=>{const k=i-s.nowIndex;return k===0?'agora':`${k<0?'−':'+'}${Math.abs(k)}${s.step==='hour'?'h':'d'}`});
   const es=energyScale(s.consumption.measured,s.consumption.predicted);$('#pcunit').textContent=es.unit;
   chart('c1','line',labels,[line('--con','Real',es.scale(s.consumption.measured)),line('--gen','Previsto',es.scale(s.consumption.predicted),[6,4])],{min:0},[nowLine(s.nowIndex)]);
   chart('c2','line',labels,[line('--con','Real',s.battery.measured),line('--cr','Projeção',s.battery.predicted,[6,4])],{min:0,max:100},[nowLine(s.nowIndex)])};
- $('#pdev').onchange=e=>{sel=e.target.value;drawCharts()};
- V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
+ $('#pdev').onchange=e=>{st.sel=e.target.value;drawCharts()};
+ V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){st.sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
  drawRange();await drawCharts()}

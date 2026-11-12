@@ -85,3 +85,6 @@ input,select,textarea{background:var(--sf);color:var(--tx);border:1px solid var(
 .card-actions{display:flex;gap:8px;margin-top:12px}
 .btn.danger{border-color:var(--cr);color:var(--cr)}
 .btn:disabled{opacity:.6;cursor:default}
+/* "Atualizado há X s" no cabeçalho (atualização automática) */
+.upd{font-size:12px;white-space:nowrap}.upd.err{color:var(--cr)}
+@media(max-width:520px){.upd{display:none}}

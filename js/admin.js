@@ -40,7 +40,9 @@ async manutencao(){
   if(d.battery<45||(f&&f.daysLeft!=null&&f.daysLeft<=7))return{label:'Atenção',color:css('--wn'),className:'medium'};
   return{label:'Baixo',color:css('--ok'),className:'low'}
  };
- let scope='abertas',notice='',map=null;
+ /* filtro e enquadramento do mapa sobrevivem à atualização automática */
+ const st=pageState({scope:'abertas',mapView:null});
+ let notice='',map=null;
  const regionOf=r=>deviceById[r.deviceId]?.region||'Sem região definida';
  const requestCard=r=>{
   const device=deviceById[r.deviceId],risk=device&&riskOf(device);
@@ -65,6 +67,7 @@ async manutencao(){
  };
  const draw=()=>{
   if(map){map.remove();map=null}
+  const scope=st.scope;
   const matching=requests.filter(r=>{
    if(scope==='abertas')return r.status!=='Concluída';
    if(scope==='proximas')return upcoming(r);
@@ -91,7 +94,7 @@ async manutencao(){
    <div id="maintenance-filters"></div>
    ${Object.keys(groups).length?Object.keys(groups).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(region=>`<section><h3 class="sec">${esc(region)} <span class="mu">(${groups[region].length})</span></h3>${groups[region].map(requestCard).join('')}</section>`).join(''):`<div class="card mu">Nenhuma solicitação neste filtro.</div>`}`;
   const filterHost=$('#maintenance-filters');
-  filterHost.append(filters([['abertas','Em aberto'],['proximas','Próximas 3 semanas'],['concluidas','Concluídas'],['todas','Todas']],scope,k=>{scope=k;draw()}));
+  filterHost.append(filters([['abertas','Em aberto'],['proximas','Próximas 3 semanas'],['concluidas','Concluídas'],['todas','Todas']],scope,k=>{st.scope=k;draw()}));
   const mapNote=$('#map-note');
   const points=devices.filter(d=>Number.isFinite(d.latitude)&&Number.isFinite(d.longitude));
   if(typeof window.L==='undefined'||typeof window.L.map!=='function'){mapNote.textContent='O mapa não foi carregado. Verifique a conexão para acessar o serviço de mapas.'}
@@ -118,6 +121,9 @@ async manutencao(){
    });
    if(markers.length){const b=window.L.featureGroup(markers).getBounds();map.fitBounds(b.pad(.2));map.setMaxBounds(b.pad(4))}
    else map.setView([-15.79,-47.88],11);
+   /* mantém o zoom/posição que o usuário escolheu quando a tela é redesenhada */
+   if(st.mapView)map.setView(st.mapView.center,st.mapView.zoom,{animate:false});
+   map.on('moveend',()=>{if(sizeMap===map)st.mapView={center:map.getCenter(),zoom:map.getZoom()}});
    if(points.length<devices.length)mapNote.textContent=`${devices.length-points.length} dispositivo(s) sem coordenadas não aparecem no mapa.`
   }
   V.onclick=async e=>{
@@ -136,7 +142,9 @@ async manutencao(){
 async dispositivos(notice=''){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
- let current='all',form=null; /* form: null | {mode:'new'|'edit', s: configuração, channel: dados do canal} */
+ /* o filtro sobrevive à atualização automática (com o formulário aberto ela fica pausada) */
+ const st=pageState({filter:'all'});
+ let current=st.filter,form=null; /* form: null | {mode:'new'|'edit', s: configuração, channel: dados do canal} */
  /* saldo = energia coletada - consumo (Wh). Sem harvesting, o saldo é só o consumo negativo. */
  /* null quando falta consumo ou coleta medidos (não dá para calcular o saldo) */
  const balance=d=>d.consumption==null||(d.harvesting&&d.harvesting.collected==null)?null:(d.harvesting?d.harvesting.collected:0)-d.consumption;
@@ -166,7 +174,7 @@ async dispositivos(notice=''){
   </div>`;
  };
  const draw=k=>{
-  current=k;
+  current=st.filter=k;
   const list=devices.filter(filtersFn[k]);
   V.innerHTML=notice?`<div class="banner" role="status">${esc(notice)}</div>`:'';
   const top=filters([['all','Todos'],['on','Online'],['off','Offline'],['low','Bateria baixa'],['neg','Saldo negativo'],['risk','Em risco (≤ 7 dias)']],k,draw);
@@ -267,7 +275,7 @@ async dispositivos(notice=''){
    draw(current);
   }
  };
- V.onsubmit=async e=>{
+ const submit=V.onsubmit=async e=>{
   /* getAttribute: o form tem um campo "id", e form.id devolveria esse campo, não o atributo */
   if(e.target.getAttribute('id')!=='devform')return;
   e.preventDefault();
@@ -279,8 +287,9 @@ async dispositivos(notice=''){
    await pages.dispositivos(`Dispositivo ${form.s.name} salvo.`);
   }catch(err){form.error=err.message;draw(current)}
  };
- onLeave(()=>{V.onsubmit=null});
- draw('all')},
+ /* só remove o próprio handler: na atualização automática, a versão nova já registrou o dela */
+ onLeave(()=>{if(V.onsubmit===submit)V.onsubmit=null});
+ draw(current)},
 previsao:()=>renderForecast({detailed:true}),
 historico:()=>renderHistory({custom:true,storageTitle:'Energia armazenada'}),
 async alertas(){const a=await api.getAlerts();
@@ -295,4 +304,4 @@ async configuracoes(){V.innerHTML=`<div class="card" style="max-width:640px">
 };
 let eco=false;
 const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['configuracoes','Configurações']];
-startApp(NAV,pages);
+startApp(NAV,pages,{staticPages:['configuracoes']});
