@@ -37,7 +37,7 @@ public record EcoSenseProperties(
     /**
      * @param baseUrl    URL da API do ThingSpeak
      * @param readApiKey Read API Key padrão (use variável de ambiente; vazio para canais públicos)
-     * @param simulate   true = não chama o ThingSpeak e gera leituras simuladas (desenvolvimento)
+     * @param simulate   true = leituras simuladas, sem chamar o ThingSpeak (usado só pelos testes automáticos)
      */
     public record ThingSpeak(String baseUrl, String readApiKey, boolean simulate) {
         public ThingSpeak {
@@ -58,7 +58,6 @@ public record EcoSenseProperties(
      *                       lê no máximo 8000 entradas por pedido: use ~2 para canais que enviam a cada
      *                       30 s, ~27 para 5 min. Padrão 31 (um pedido só).
      * @param conversion     converte as unidades do canal para as do EcoSense (ex.: V → %, mW → W)
-     * @param sim            parâmetros do modo simulado (ignorado com o ThingSpeak real)
      */
     public record DeviceConfig(
             String id, String name, String location, String region,
@@ -66,7 +65,7 @@ public record EcoSenseProperties(
             Integer txInterval, String type, String priority,
             String harvestingType, Double sunHours,
             Long channelId, String readApiKey, Integer historyChunkDays,
-            Fields fields, Conversion conversion, Simulation sim) {
+            Fields fields, Conversion conversion) {
 
         public DeviceConfig {
             historyChunkDays = historyChunkDays != null && historyChunkDays > 0 ? historyChunkDays : 31;
@@ -75,7 +74,6 @@ public record EcoSenseProperties(
             priority = priority != null ? priority : "Média";
             fields = fields != null ? fields : new Fields(null, null, null, null);
             conversion = conversion != null ? conversion : Conversion.NONE;
-            sim = sim != null ? sim : Simulation.DEFAULT;
         }
     }
 
@@ -108,14 +106,13 @@ public record EcoSenseProperties(
      */
     public record StorageConfig(
             String name, String type, Double capacityKwh,
-            Long channelId, String readApiKey, String field, Conversion conversion, Simulation sim) {
+            Long channelId, String readApiKey, String field, Conversion conversion) {
 
         public StorageConfig {
             type = type != null ? type : "Bateria";
             capacityKwh = capacityKwh != null ? capacityKwh : 0d;
             field = field != null ? field : "field1";
             conversion = conversion != null ? conversion : Conversion.NONE;
-            sim = sim != null ? sim : Simulation.DEFAULT;
         }
     }
 
@@ -159,29 +156,6 @@ public record EcoSenseProperties(
 
         public Double temperature(Double raw) {
             return raw == null ? null : raw * temperatureScale;
-        }
-    }
-
-    /**
-     * Comportamento do dispositivo no modo simulado.
-     *
-     * @param battery        % de bateria agora
-     * @param trendPerDay    variação da bateria em pontos percentuais por dia
-     * @param consumptionW   consumo médio em W
-     * @param harvestedW     coleta média em W (média do dia inteiro)
-     * @param temperature    temperatura média em °C
-     * @param offlineMinutes há quantos minutos parou de transmitir (null = online)
-     */
-    public record Simulation(Double battery, Double trendPerDay, Double consumptionW,
-                             Double harvestedW, Double temperature, Integer offlineMinutes) {
-        static final Simulation DEFAULT = new Simulation(null, null, null, null, null, null);
-
-        public Simulation {
-            battery = battery != null ? battery : 70d;
-            trendPerDay = trendPerDay != null ? trendPerDay : 0d;
-            consumptionW = consumptionW != null ? consumptionW : 0.5;
-            harvestedW = harvestedW != null ? harvestedW : 0d;
-            temperature = temperature != null ? temperature : 25d;
         }
     }
 }

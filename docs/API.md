@@ -1,8 +1,8 @@
 # Contrato da API — EcoSense
 
 Formato que o back-end ([`backend/`](../backend/README.md), Java + Spring Boot) devolve ao front-end.
-O front funciona com os mesmos dados mockados em [`js/data/mock.js`](../js/data/mock.js) ou com o back-end:
-basta definir `ECOSENSE_API_URL` em [`js/config.js`](../js/config.js) (ex.: `http://localhost:8080/api`).
+O front-end chama estes endpoints pelo [`js/services/api.js`](../js/services/api.js); o endereço do back-end
+fica em [`js/config.js`](../js/config.js) (padrão `http://localhost:8080/api`).
 
 ## Arquitetura
 
@@ -175,5 +175,5 @@ corpo `{ "deviceId": "IOT-007", "reason": "…", "note": "…" }`; responde com 
 
 `PATCH /api/maintenance-requests/{id}` → `api.updateMaintenanceRequest(id, {status, scheduledFor})`
 corpo `{ "status": "Agendada", "scheduledFor": "2026-11-21" }`; responde com a solicitação atualizada.
-Regras (validadas no back-end e no mock): `scheduledFor` vazio mantém a data atual;
+Regras (validadas no back-end): `scheduledFor` vazio mantém a data atual;
 voltar para `Recebida` limpa a data; `Agendada` exige data válida e não passada.

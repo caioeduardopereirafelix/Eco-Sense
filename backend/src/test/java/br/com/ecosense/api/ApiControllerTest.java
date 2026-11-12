@@ -17,10 +17,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** API completa com o cliente simulado do ThingSpeak (application.yml padrão). */
-@SpringBootTest(properties = "ecosense.thingspeak.simulate=true")
+@SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 class ApiControllerTest {
 
@@ -85,7 +87,8 @@ class ApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.step").value("day"))
                 .andExpect(jsonPath("$.timestamps", hasSize(7)))
-                .andExpect(jsonPath("$.generatedKwh[6]").isNumber())
+                /* [5] = ontem (sempre completo); hoje ([6]) pode não ter leitura logo após a meia-noite */
+                .andExpect(jsonPath("$.generatedKwh[5]").isNumber())
                 .andExpect(jsonPath("$.storagePct[0]").isNumber());
         mvc.perform(get("/api/history").param("range", "hoje"))
                 .andExpect(jsonPath("$.step").value("hour"))

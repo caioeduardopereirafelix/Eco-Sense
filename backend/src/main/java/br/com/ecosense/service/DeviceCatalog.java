@@ -19,7 +19,6 @@ import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.Conversion;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 import br.com.ecosense.config.EcoSenseProperties.Fields;
-import br.com.ecosense.config.EcoSenseProperties.Simulation;
 import br.com.ecosense.persistence.DeviceEntity;
 import br.com.ecosense.persistence.DeviceRepository;
 
@@ -135,7 +134,7 @@ public class DeviceCatalog {
             throw ApiException.badRequest("A tensão de bateria cheia deve ser maior que a de bateria vazia.");
     }
 
-    /** Copia os campos editáveis; os parâmetros de simulação ficam como estão. */
+    /** Copia os campos editáveis do formulário para a entidade. */
     private void apply(DeviceSettings s, DeviceEntity e) {
         e.setName(s.name().trim());
         e.setLocation(blankToNull(s.location()));
@@ -170,9 +169,7 @@ public class DeviceCatalog {
                 e.getHarvestingType(), e.getSunHours(), e.getChannelId(), null, e.getHistoryChunkDays(),
                 new Fields(e.getFieldBattery(), e.getFieldConsumption(), e.getFieldTemperature(), e.getFieldHarvested()),
                 new Conversion(e.getBatteryVoltageMin(), e.getBatteryVoltageMax(),
-                        e.getConsumptionScale(), e.getHarvestedScale(), e.getTemperatureScale()),
-                new Simulation(e.getSimBattery(), e.getSimTrendPerDay(), e.getSimConsumptionW(),
-                        e.getSimHarvestedW(), e.getSimTemperature(), e.getSimOfflineMinutes()));
+                        e.getConsumptionScale(), e.getHarvestedScale(), e.getTemperatureScale()));
     }
 
     static DeviceEntity fromConfig(DeviceConfig d) {
@@ -200,13 +197,6 @@ public class DeviceCatalog {
         e.setConsumptionScale(c.consumptionScale());
         e.setHarvestedScale(c.harvestedScale());
         e.setTemperatureScale(c.temperatureScale());
-        Simulation s = d.sim();
-        e.setSimBattery(s.battery());
-        e.setSimTrendPerDay(s.trendPerDay());
-        e.setSimConsumptionW(s.consumptionW());
-        e.setSimHarvestedW(s.harvestedW());
-        e.setSimTemperature(s.temperature());
-        e.setSimOfflineMinutes(s.offlineMinutes());
         return e;
     }
 

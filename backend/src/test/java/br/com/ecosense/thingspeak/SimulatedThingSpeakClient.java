@@ -5,38 +5,76 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
-import br.com.ecosense.config.EcoSenseProperties.Simulation;
 import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
 import br.com.ecosense.service.DeviceCatalog;
 
 /**
- * Gera leituras no mesmo formato do ThingSpeak, a partir dos parâmetros {@code sim} de cada
- * dispositivo. Permite desenvolver e testar sem canais reais. Ativo com
- * {@code ecosense.thingspeak.simulate=true}. Os valores são determinísticos (mesma hora = mesmo valor).
+ * SÓ PARA TESTES: gera leituras no mesmo formato do ThingSpeak, para os testes automáticos rodarem
+ * sem internet e com dados previsíveis. Ativo com {@code ecosense.thingspeak.simulate=true}
+ * (perfil "test", src/test/resources/application-test.yml). Cada canal se comporta conforme
+ * {@code test-sim.channels.<channelId>}. Os valores são determinísticos (mesma hora = mesmo valor).
  */
 @Component
 @ConditionalOnProperty(name = "ecosense.thingspeak.simulate", havingValue = "true")
+@EnableConfigurationProperties(SimulatedThingSpeakClient.SimulationProperties.class)
 public class SimulatedThingSpeakClient implements ThingSpeakClient {
 
+    /**
+     * Comportamento de um canal simulado.
+     *
+     * @param battery        % de bateria agora
+     * @param trendPerDay    variação da bateria em pontos percentuais por dia
+     * @param consumptionW   consumo médio em W
+     * @param harvestedW     coleta média em W (média do dia inteiro)
+     * @param temperature    temperatura média em °C
+     * @param offlineMinutes há quantos minutos parou de transmitir (null = online)
+     */
+    public record Sim(Double battery, Double trendPerDay, Double consumptionW,
+                      Double harvestedW, Double temperature, Integer offlineMinutes) {
+        static final Sim DEFAULT = new Sim(null, null, null, null, null, null);
+
+        public Sim {
+            battery = battery != null ? battery : 70d;
+            trendPerDay = trendPerDay != null ? trendPerDay : 0d;
+            consumptionW = consumptionW != null ? consumptionW : 0.5;
+            harvestedW = harvestedW != null ? harvestedW : 0d;
+            temperature = temperature != null ? temperature : 25d;
+        }
+    }
+
+    /** Parâmetros dos canais simulados (prefixo {@code test-sim}). */
+    @ConfigurationProperties(prefix = "test-sim")
+    public record SimulationProperties(Map<Long, Sim> channels) {
+        public SimulationProperties {
+            channels = channels != null ? channels : Map.of();
+        }
+    }
+
     private final EcoSenseProperties props;
+    private final SimulationProperties sims;
     private final Clock clock;
     /* lazy: o catálogo depende (indiretamente) deste cliente */
     private final ObjectProvider<DeviceCatalog> catalog;
 
-    public SimulatedThingSpeakClient(EcoSenseProperties props, Clock clock, ObjectProvider<DeviceCatalog> catalog) {
+    public SimulatedThingSpeakClient(EcoSenseProperties props, SimulationProperties sims, Clock clock,
+                                     ObjectProvider<DeviceCatalog> catalog) {
         this.props = props;
-        this.catalog = catalog;
+        this.sims = sims;
         this.clock = clock;
+        this.catalog = catalog;
     }
 
     @Override
@@ -62,44 +100,49 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         return feeds;
     }
 
-    /** Canal simulado: nomes de fields padrão do EcoSense; nome/local do dispositivo que usa o canal, se houver. */
+    /** Canal simulado: nomes de fields padrão; nome e local do dispositivo que usa o canal, se houver. */
     @Override
     public ChannelMeta channel(long channelId, String readApiKey) {
-        Optional<DeviceConfig> device = catalog.getObject().all().stream()
-                .filter(d -> d.channelId() != null && d.channelId() == channelId).findFirst();
-        Map<String, String> fields = new java.util.LinkedHashMap<>();
+        Optional<DeviceConfig> device = deviceFor(channelId);
+        Map<String, String> fields = new LinkedHashMap<>();
         fields.put("field1", "Bateria (%)");
         fields.put("field2", "Consumo (W)");
         fields.put("field3", "Temperatura (°C)");
         fields.put("field4", "Energia coletada (W)");
-        Instant now = clock.instant();
         return new ChannelMeta(channelId,
                 device.map(DeviceConfig::name).orElse("Canal simulado " + channelId),
-                "Canal gerado pelo modo simulado do EcoSense",
+                "Canal simulado (testes)",
                 device.map(DeviceConfig::latitude).orElse(null),
                 device.map(DeviceConfig::longitude).orElse(null),
-                fields, lastTransmission(channelId, now));
+                fields, lastTransmission(channelId, clock.instant()));
     }
 
-    /** Dispositivos "offline" na simulação param de transmitir há {@code offlineMinutes}. */
+    /** Canais "offline" param de transmitir há {@code offlineMinutes}. */
     private Instant lastTransmission(long channelId, Instant now) {
-        Integer offline = simulation(channelId).offlineMinutes();
+        Integer offline = sim(channelId).offlineMinutes();
         return offline == null ? now.minusSeconds(30) : now.minus(Duration.ofMinutes(offline));
     }
 
-    private Feed feedAt(long channelId, Instant t, Instant now) {
-        Optional<DeviceConfig> device = catalog.getObject().all().stream()
+    private Sim sim(long channelId) {
+        return sims.channels().getOrDefault(channelId, Sim.DEFAULT);
+    }
+
+    private Optional<DeviceConfig> deviceFor(long channelId) {
+        return catalog.getObject().all().stream()
                 .filter(d -> d.channelId() != null && d.channelId() == channelId).findFirst();
+    }
+
+    private Feed feedAt(long channelId, Instant t, Instant now) {
+        Optional<DeviceConfig> device = deviceFor(channelId);
         if (device.isPresent()) return deviceFeed(device.get(), t, now);
         StorageConfig storage = props.storage().stream()
                 .filter(s -> s.channelId() != null && s.channelId() == channelId).findFirst().orElse(null);
-        double battery = storage == null ? 50 : storage.sim().battery();
         String field = storage == null ? "field1" : storage.field();
-        return new Feed(t, Map.of(field, fmt(battery + noise(channelId, t, 1))));
+        return new Feed(t, Map.of(field, fmt(sim(channelId).battery() + noise(channelId, t, 1))));
     }
 
     private Feed deviceFeed(DeviceConfig d, Instant t, Instant now) {
-        Simulation s = d.sim();
+        Sim s = sim(d.channelId());
         long channel = d.channelId();
         double daysFromNow = Duration.between(now, t).toMinutes() / 1440.0;
         int hour = ZonedDateTime.ofInstant(t, props.zone()).getHour();
@@ -115,21 +158,12 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         double temperature = s.temperature() + 3 * Math.sin((hour - 9) / 24.0 * 2 * Math.PI);
 
         var f = d.fields();
-        return new Feed(t, Map.of(
-                f.battery(), fmt(battery),
-                f.consumption(), fmt(consumption),
-                f.temperature(), fmt(temperature),
-                f.harvested(), fmt(harvested)));
-    }
-
-    private Simulation simulation(long channelId) {
-        return catalog.getObject().all().stream()
-                .filter(d -> d.channelId() != null && d.channelId() == channelId)
-                .map(DeviceConfig::sim).findFirst()
-                .orElseGet(() -> props.storage().stream()
-                        .filter(s -> s.channelId() != null && s.channelId() == channelId)
-                        .map(StorageConfig::sim).findFirst()
-                        .orElse(new Simulation(null, null, null, null, null, null)));
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put(f.battery(), fmt(battery));
+        values.put(f.consumption(), fmt(consumption));
+        values.put(f.temperature(), fmt(temperature));
+        values.put(f.harvested(), fmt(harvested));
+        return new Feed(t, values);
     }
 
     /** Ruído determinístico em [-amplitude, +amplitude], fixo para cada canal e hora. */

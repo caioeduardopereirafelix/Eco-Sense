@@ -13,10 +13,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** Cadastro de dispositivos no banco (H2 em memória, modo simulado). */
-@SpringBootTest(properties = "ecosense.thingspeak.simulate=true")
+@SpringBootTest
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 class DeviceAdminControllerTest {
 

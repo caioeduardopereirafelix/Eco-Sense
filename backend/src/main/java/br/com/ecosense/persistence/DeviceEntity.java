@@ -56,13 +56,6 @@ public class DeviceEntity {
     private Double harvestedScale;
     private Double temperatureScale;
 
-    /* parâmetros do modo simulado (ignorados com o ThingSpeak real) */
-    private Double simBattery;
-    private Double simTrendPerDay;
-    private Double simConsumptionW;
-    private Double simHarvestedW;
-    private Double simTemperature;
-    private Integer simOfflineMinutes;
 
     /** ordem de exibição */
     private Integer position;
@@ -113,18 +106,6 @@ public class DeviceEntity {
     public void setHarvestedScale(Double harvestedScale) { this.harvestedScale = harvestedScale; }
     public Double getTemperatureScale() { return temperatureScale; }
     public void setTemperatureScale(Double temperatureScale) { this.temperatureScale = temperatureScale; }
-    public Double getSimBattery() { return simBattery; }
-    public void setSimBattery(Double simBattery) { this.simBattery = simBattery; }
-    public Double getSimTrendPerDay() { return simTrendPerDay; }
-    public void setSimTrendPerDay(Double simTrendPerDay) { this.simTrendPerDay = simTrendPerDay; }
-    public Double getSimConsumptionW() { return simConsumptionW; }
-    public void setSimConsumptionW(Double simConsumptionW) { this.simConsumptionW = simConsumptionW; }
-    public Double getSimHarvestedW() { return simHarvestedW; }
-    public void setSimHarvestedW(Double simHarvestedW) { this.simHarvestedW = simHarvestedW; }
-    public Double getSimTemperature() { return simTemperature; }
-    public void setSimTemperature(Double simTemperature) { this.simTemperature = simTemperature; }
-    public Integer getSimOfflineMinutes() { return simOfflineMinutes; }
-    public void setSimOfflineMinutes(Integer simOfflineMinutes) { this.simOfflineMinutes = simOfflineMinutes; }
     public Integer getPosition() { return position; }
     public void setPosition(Integer position) { this.position = position; }
     public Instant getCreatedAt() { return createdAt; }

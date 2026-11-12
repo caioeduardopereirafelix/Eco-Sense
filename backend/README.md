@@ -1,67 +1,64 @@
 # EcoSense — back-end
 
-API em Java 21 + Spring Boot 3.5 que lê os canais do **ThingSpeak** e entrega os dados ao
-front-end no formato de [`docs/API.md`](../docs/API.md).
+API em Java 21 + Spring Boot 3.5 que lê os canais do **ThingSpeak**, guarda o cadastro no **MySQL** e
+entrega os dados ao front-end no formato de [`docs/API.md`](../docs/API.md).
 
 ```
 Sensores ──▶ ThingSpeak ──▶ este back-end (/api/...) ──▶ front-end (index.html, admin/)
+                                   │
+                                   └── MySQL: cadastro de dispositivos e manutenção
 ```
 
 ## Rodar
 
-Pré-requisito: JDK 21 ou mais novo. O Maven vem junto (`mvnw`).
+Pré-requisitos: **JDK 21+** e **MySQL 8** rodando. O Maven vem junto (`mvnw`).
 
-```bash
-cd backend
-./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
-```
+1. Copie [`.env.example`](.env.example) para `backend/.env` e preencha (o `.env` não vai para o git):
 
-A API sobe em `http://localhost:8080/api` (ex.: http://localhost:8080/api/devices).
-Por padrão roda em **modo simulado**: gera leituras parecidas com as do ThingSpeak para os 10
-dispositivos do `application.yml`, sem precisar de canais reais.
+   ```properties
+   THINGSPEAK_READ_API_KEY=          # só para canais privados; vazio = só canais públicos
+   MYSQL_URL=jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC
+   MYSQL_USER=root
+   MYSQL_PASSWORD=sua_senha
+   ```
 
-Para o front-end usar o back-end, edite [`js/config.js`](../js/config.js):
+2. Suba o back-end:
 
-```js
-window.ECOSENSE_API_URL='http://localhost:8080/api';
-```
+   ```bash
+   cd backend
+   ./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
+   ```
 
-e abra o front por um servidor local (Live Server do VS Code na porta 5500, `npx serve -l 5173` etc.).
-As origens liberadas no CORS ficam em `ecosense.cors-origins`.
+   No IntelliJ: rode a classe `EcoSenseApplication` (sem argumentos). O *Working directory* deve ser a
+   pasta do projeto ou `backend/`, para o `.env` ser encontrado.
 
-Testes: `./mvnw test`
+3. A API sobe em `http://localhost:8080/api` (ex.: http://localhost:8080/api/devices). O front-end já
+   aponta para esse endereço em [`js/config.js`](../js/config.js); abra-o por um servidor local (Live
+   Server do VS Code na porta 5500, `npx serve -l 5173` etc.). As origens liberadas no CORS ficam em
+   `ecosense.cors-origins`.
+
+Ao iniciar, o log mostra `Read API Key configurada (N caracteres)` (ou `NÃO configurada`) e, na
+primeira consulta com o banco vazio, `Banco vazio: 10 dispositivo(s) iniciais copiados da configuração`.
+Se aparecer `Access denied for user`, confira `MYSQL_USER`/`MYSQL_PASSWORD`.
 
 ## Banco de dados (MySQL)
 
 O **cadastro dos dispositivos** (nome, local, canal do ThingSpeak, fields, conversões) e as
-**solicitações de manutenção** ficam no banco. As **leituras** não: continuam vindo do ThingSpeak em
-tempo real.
-
-| Modo | Banco | Precisa instalar? |
-|---|---|---|
-| Simulado (padrão) e testes | H2 em memória (some ao reiniciar) | Não |
-| Perfil `thingspeak` | **MySQL** (tabelas `devices` e `maintenance_requests`) | Sim, MySQL 8 |
-
-Configure o acesso no `backend/.env` (modelo em [`.env.example`](.env.example)):
-
-```properties
-MYSQL_URL=jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC
-MYSQL_USER=root
-MYSQL_PASSWORD=sua_senha
-```
+**solicitações de manutenção** ficam no banco (tabelas `devices` e `maintenance_requests`). As
+**leituras** não: vêm do ThingSpeak em tempo real.
 
 - O banco `ecosense` e as tabelas são **criados sozinhos** na primeira execução (Hibernate `ddl-auto: update`).
-- Com a tabela `devices` vazia, os dispositivos do `application-thingspeak.yml` são **copiados para o
-  banco uma única vez**. Depois disso, o YAML não é mais lido para dispositivos: adicione, edite e remova
-  pelo painel **admin → Dispositivos IoT** (botão "+ Novo dispositivo" e "Buscar canal", que lê o nome
-  dos fields no ThingSpeak). Para voltar ao cadastro inicial, apague as linhas da tabela `devices`.
-- A Read API Key **não** é guardada no banco (continua no `.env`).
-- As baterias do sistema (`ecosense.storage`) continuam no YAML.
+- Com a tabela `devices` vazia, os dispositivos de `ecosense.devices` no
+  [`application.yml`](src/main/resources/application.yml) são **copiados para o banco uma única vez** (é o
+  que preenche o banco de quem clona o projeto). Depois disso, adicione, edite e remova pelo painel
+  **admin → Dispositivos IoT** ("+ Novo dispositivo" e "Buscar canal", que lê o nome dos fields no
+  ThingSpeak). Para voltar ao cadastro inicial, apague as linhas da tabela `devices`.
+- A Read API Key **não** é guardada no banco (fica no `.env`).
+- As baterias do sistema (`ecosense.storage`) ficam no `application.yml`.
 
-## Rodar com dados reais (perfil `thingspeak`)
+## Fontes dos dados
 
-O perfil [`application-thingspeak.yml`](src/main/resources/application-thingspeak.yml) desliga a simulação e
-lê **canais públicos** do ThingSpeak com dados reais e ativos (não precisam de chave):
+Os dispositivos iniciais são **canais públicos** do ThingSpeak (não precisam de chave):
 
 | No EcoSense | Canal | Origem | Leituras usadas |
 |---|---|---|---|
@@ -108,74 +105,29 @@ canal de 30 s); depois o back-end busca só as horas novas.
 
 ### Canal próprio (privado)
 
-Para usar um canal privado, como o 3574018 criado para o projeto (exemplo comentado no perfil), é preciso
-a Read API Key. **Onde colocar a Read API Key** (aba "API Keys" do canal → "Read API Keys") — escolha uma:
+Canais privados (como o 3574018 criado para o projeto) precisam da Read API Key em
+`THINGSPEAK_READ_API_KEY` no `.env` (aba "API Keys" do canal → "Read API Keys"). Sem ela o ThingSpeak
+responde `-1`: a API continua no ar, o dispositivo aparece Offline e o log avisa.
 
-- **Arquivo `backend/.env`** (recomendado): copie [`.env.example`](.env.example) para `.env` e preencha
-  `THINGSPEAK_READ_API_KEY=...`. O back-end lê esse arquivo ao iniciar (ou um `.env` na pasta de onde
-  ele foi iniciado) e o `.gitignore` impede que ele vá para o GitHub.
-- **Variável de ambiente** no IntelliJ (Run Configuration → Environment variables) ou no terminal.
-  Variáveis de ambiente têm prioridade sobre o `.env`.
-
-Ao iniciar, o log confirma: `Read API Key configurada (N caracteres)` ou `NÃO configurada`.
-
-```powershell
-# Windows (PowerShell), com a chave no backend/.env
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=thingspeak"
-```
-
-```bash
-# Linux/macOS
-export THINGSPEAK_READ_API_KEY=SUA_READ_API_KEY
-./mvnw spring-boot:run -Dspring-boot.run.profiles=thingspeak
-```
-
-Sem a chave (canal privado), o ThingSpeak responde `-1`: a API continua no ar, o dispositivo aparece
-Offline e o log avisa para definir `THINGSPEAK_READ_API_KEY`.
-
-**Testar sem a placa:** envie uma leitura pelo navegador com a *Write API Key* (aba "API Keys"):
+**Testar sem a placa:** envie uma leitura pelo navegador com a *Write API Key*:
 
 ```
 https://api.thingspeak.com/update?api_key=SUA_WRITE_API_KEY&field1=87&field2=0.5&field3=24&field4=0.6
 ```
 
 A resposta é o número da entrada (ou `0` se enviar de novo antes de 15 s, limite do plano gratuito).
-Depois de ~1 min (cache), `GET /api/devices` mostra o Sensor 01 Online com esses valores
-(com o dispositivo IOT-003 descomentado no perfil).
+Depois de ~1 min (cache), o dispositivo cadastrado com esse canal aparece Online com esses valores.
 
-## Conectar outros canais ao ThingSpeak
+## Testes
 
-O jeito mais simples é pelo painel **admin → Dispositivos IoT → "+ Novo dispositivo"**: informe o
-Channel ID, clique em **Buscar canal** e escolha em qual field está cada leitura. O que segue abaixo é
-para definir os dispositivos **iniciais** (copiados para o banco só quando ele está vazio).
+```bash
+./mvnw test
+```
 
-1. Em [`src/main/resources/application.yml`](src/main/resources/application.yml) (ou no perfil `thingspeak`), para cada dispositivo
-   em `ecosense.devices`, coloque o `channel-id` real e diga em qual field está cada leitura:
-
-   ```yaml
-   - id: IOT-001
-     name: Sensor Ambiental 01
-     channel-id: 1234567            # ID do canal no ThingSpeak
-     fields: { battery: field1, consumption: field2, temperature: field3, harvested: field4 }
-   ```
-
-   Unidades esperadas nos fields: **battery em %**, **consumption em W**, **temperature em °C**,
-   **harvested em W** (potência coletada). Se o seu canal usar outra unidade (mW, por exemplo),
-   converta no firmware ou avise para adicionarmos um fator de conversão.
-
-2. Defina as variáveis de ambiente e desligue a simulação:
-
-   ```bash
-   export THINGSPEAK_SIMULATE=false
-   export THINGSPEAK_READ_API_KEY=SUA_READ_API_KEY   # omita para canais públicos
-   ```
-
-   No Windows (PowerShell): `$env:THINGSPEAK_SIMULATE='false'; $env:THINGSPEAK_READ_API_KEY='...'`.
-   Canais com chaves diferentes: use `read-api-key: ${THINGSPEAK_KEY_IOT001:}` no dispositivo.
-   **Nunca** coloque a chave no `application.yml` nem no front-end.
-
-3. Opcional: em `ecosense.storage`, cadastre as baterias do sistema (canal + field com o % de carga).
-   Sem elas, o "armazenamento" da visão geral é a média das baterias dos dispositivos.
+Os testes **não** usam internet nem MySQL: o perfil `test`
+([`src/test/resources/application-test.yml`](src/test/resources/application-test.yml)) liga um banco H2
+em memória e o `SimulatedThingSpeakClient` (só em `src/test`), que gera leituras previsíveis no formato
+do ThingSpeak para 10 dispositivos de teste.
 
 ## Como os dados são calculados
 
@@ -196,9 +148,13 @@ para definir os dispositivos **iniciais** (copiados para o banco só quando ele 
 src/main/java/br/com/ecosense/
 ├── config/       EcoSenseProperties (application.yml), CORS, Clock
 ├── persistence/  Entidades JPA e repositórios: DeviceEntity, MaintenanceRequestEntity
-├── thingspeak/   ThingSpeakClient: HttpThingSpeakClient (real) e SimulatedThingSpeakClient
+├── thingspeak/   ThingSpeakClient e HttpThingSpeakClient (API REST do ThingSpeak)
 ├── service/      DeviceCatalog (cadastro no banco), ReadingService (cache), DeviceService,
 │                 ForecastService, HistoryService, EnergyService (visão geral, fontes, cargas,
 │                 baterias, alertas), MaintenanceService
 └── api/          ApiController (/api/...), DeviceAdminController (cadastro), ApiDtos, erros
+
+src/test/
+├── java/.../thingspeak/SimulatedThingSpeakClient.java   leituras simuladas (só testes)
+└── resources/application-test.yml                        H2 + dispositivos de teste
 ```

@@ -84,7 +84,7 @@ function startApp(NAV,pages){
   catch(error){
    if(token!==navToken)return;
    console.error(error);
-   V.innerHTML=`<div class="banner" role="alert" style="border-color:var(--cr)">Não foi possível carregar esta tela: ${esc(error&&error.message||error)}. <button class="btn" id="retry" style="margin-left:8px">Tentar novamente</button></div>`;
+   V.innerHTML=`<div class="banner" role="alert" style="border-color:var(--cr)">Não foi possível carregar esta tela: ${esc(String(error&&error.message||error).replace(/\.$/,''))}. <button class="btn" id="retry" style="margin-left:8px">Tentar novamente</button></div>`;
    $('#retry').onclick=go;return}
   if(token===navToken)window.scrollTo(0,0)}
  window.addEventListener('hashchange',go);
