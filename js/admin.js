@@ -378,11 +378,7 @@ Ele perde o acesso imediatamente.`))return;
  draw()},
 async configuracoes(){
  const me=await api.getMe();
- V.innerHTML=`${accountCards(me)}
- <div class="card" style="max-width:640px">
- <h3>Alertas</h3>
- ${[['Alertas de bateria crítica',1],['Alertas de consumo elevado',1],['Alertas por e-mail',0]].map(([n,o])=>`<div class="set"><b>${n}</b><button class="sw${o?' on':''}" aria-label="${n}" onclick="this.classList.toggle('on')"></button></div>`).join('')}
- </div>`;
+ V.innerHTML=accountCards(me);
  bindAccount()}
 };
 const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['usuarios','Usuários'],['configuracoes','Configurações']];

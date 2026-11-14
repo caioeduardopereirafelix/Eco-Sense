@@ -4,14 +4,24 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PreDestroy;
 
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
@@ -26,11 +36,19 @@ import br.com.ecosense.thingspeak.ThingSpeakClient;
  * Por dispositivo são 2 chamadas: a última entrada (estado atual) e as médias por hora dos
  * últimos {@value #HISTORY_DAYS} dias (histórico, tendência e previsão).
  * Se o ThingSpeak falhar, usa o último resultado em cache (ou nenhum dado) em vez de derrubar a API.
+ *
+ * Desempenho na primeira carga (até ~16 pedidos por canal):
+ * - os pedidos ao ThingSpeak rodam em paralelo, no máximo {@value #MAX_PARALLEL_REQUESTS} ao mesmo tempo;
+ * - cada dispositivo é buscado por uma requisição de cada vez: quem chega enquanto a busca está em
+ *   andamento espera e usa o mesmo resultado, em vez de repetir os pedidos;
+ * - {@link #warmUp} carrega tudo assim que o back-end liga ({@link ReadingWarmUp}).
  */
 @Service
 public class ReadingService {
 
     public static final int HISTORY_DAYS = 31;
+    /** pedidos simultâneos ao ThingSpeak (serviço gratuito: sem exagerar) */
+    static final int MAX_PARALLEL_REQUESTS = 6;
     private static final Logger log = LoggerFactory.getLogger(ReadingService.class);
 
     private final ThingSpeakClient client;
@@ -40,6 +58,13 @@ public class ReadingService {
     private final Map<String, Cached<Double>> storageCache = new ConcurrentHashMap<>();
     /** médias horárias já baixadas, por dispositivo (para a busca incremental) */
     private final Map<String, List<Reading>> hourlyStore = new ConcurrentHashMap<>();
+    /** uma busca por dispositivo (ou bateria) de cada vez */
+    private final Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
+    /**
+     * Executa SÓ os pedidos ao ThingSpeak (tarefas que não criam outras tarefas): o tamanho fixo limita os
+     * pedidos simultâneos sem risco de uma tarefa ficar esperando outra na fila.
+     */
+    private final ExecutorService requests = Executors.newFixedThreadPool(MAX_PARALLEL_REQUESTS, daemonThreads());
 
     public ReadingService(ThingSpeakClient client, EcoSenseProperties props, Clock clock) {
         this.client = client;
@@ -61,10 +86,57 @@ public class ReadingService {
                         : "configurada (" + key.length() + " caracteres)");
     }
 
+    private static java.util.concurrent.ThreadFactory daemonThreads() {
+        AtomicInteger n = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, "thingspeak-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
+    }
+
+    @PreDestroy
+    void shutdown() {
+        requests.shutdownNow();
+    }
+
+    /**
+     * Carrega as leituras de todos os dispositivos e baterias do sistema, em paralelo, e espera terminar.
+     * Usado ao ligar o back-end, para a primeira tela já encontrar os dados em cache.
+     */
+    public void warmUp(List<DeviceConfig> devices) {
+        List<Thread> tasks = new ArrayList<>();
+        for (DeviceConfig d : devices) tasks.add(Thread.ofVirtual().start(() -> data(d)));
+        for (StorageConfig s : props.storage()) tasks.add(Thread.ofVirtual().start(() -> storagePct(s)));
+        for (Thread t : tasks) {
+            try {
+                t.join();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
+
     /** Descarta as leituras guardadas de um dispositivo (após editar o canal ou removê-lo). */
     public void evict(String deviceId) {
-        deviceCache.remove(deviceId);
-        hourlyStore.remove(deviceId);
+        /* espera uma busca em andamento terminar, para ela não gravar de volta dados do canal antigo */
+        ReentrantLock lock = lockFor(deviceId);
+        lock.lock();
+        try {
+            deviceCache.remove(deviceId);
+            hourlyStore.remove(deviceId);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private ReentrantLock lockFor(String key) {
+        return locks.computeIfAbsent(key, k -> new ReentrantLock());
+    }
+
+    private boolean fresh(Cached<?> cached, Instant now) {
+        return cached != null && cached.fetchedAt().plus(props.cacheTtl()).isAfter(now);
     }
 
     /** latest = última entrada (null se o canal nunca transmitiu); hourly = médias por hora, em ordem. */
@@ -75,16 +147,31 @@ public class ReadingService {
     private record Cached<T>(Instant fetchedAt, T value) {}
 
     public DeviceData data(DeviceConfig d) {
-        Instant now = clock.instant();
         Cached<DeviceData> cached = deviceCache.get(d.id());
-        if (cached != null && cached.fetchedAt().plus(props.cacheTtl()).isAfter(now)) return cached.value();
+        if (fresh(cached, clock.instant())) return cached.value();
         if (d.channelId() == null) return DeviceData.EMPTY;
+        ReentrantLock lock = lockFor(d.id());
+        lock.lock();
+        try {
+            /* outra requisição pode ter acabado de buscar enquanto esta esperava */
+            Instant now = clock.instant();
+            cached = deviceCache.get(d.id());
+            if (fresh(cached, now)) return cached.value();
+            return fetch(d, cached, now);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private DeviceData fetch(DeviceConfig d, Cached<DeviceData> cached, Instant now) {
         try {
             String key = keyFor(d.readApiKey());
-            List<Feed> last = client.latest(d.channelId(), key, 1);
+            Future<List<Feed>> last = requests.submit(() -> client.latest(d.channelId(), key, 1));
+            List<Reading> hourly = hourly(d, key, now);
+            List<Feed> latest = await(last);
             DeviceData data = new DeviceData(
-                    last.isEmpty() ? null : toReading(last.get(last.size() - 1), d.fields(), d.conversion()),
-                    hourly(d, key, now));
+                    latest.isEmpty() ? null : toReading(latest.get(latest.size() - 1), d.fields(), d.conversion()),
+                    hourly);
             deviceCache.put(d.id(), new Cached<>(now, data));
             return data;
         } catch (RuntimeException e) {
@@ -117,17 +204,44 @@ public class ReadingService {
                 if (!r.at().isBefore(from) && r.at().isBefore(fetchFrom)) byHour.put(hourOf(r), r);
             }
         }
+        /* os pedaços são independentes: busca em paralelo e junta por hora (a ordem não importa) */
         Duration chunk = Duration.ofDays(d.historyChunkDays());
+        List<Future<List<Feed>>> parts = new ArrayList<>();
         for (Instant start = fetchFrom; start.isBefore(now); start = start.plus(chunk)) {
-            Instant end = start.plus(chunk).isAfter(now) ? now : start.plus(chunk);
-            for (Feed f : client.averaged(d.channelId(), key, start, end, 60)) {
-                Reading r = toReading(f, d.fields(), d.conversion());
-                byHour.put(hourOf(r), r);
+            Instant s = start, end = start.plus(chunk).isAfter(now) ? now : start.plus(chunk);
+            parts.add(requests.submit(() -> client.averaged(d.channelId(), key, s, end, 60)));
+        }
+        try {
+            for (Future<List<Feed>> part : parts) {
+                for (Feed f : await(part)) {
+                    Reading r = toReading(f, d.fields(), d.conversion());
+                    byHour.put(hourOf(r), r);
+                }
             }
+        } catch (RuntimeException e) {
+            parts.forEach(p -> p.cancel(true)); // um pedaço falhou: não adianta esperar os outros
+            throw e;
         }
         List<Reading> merged = List.copyOf(byHour.values());
         hourlyStore.put(d.id(), merged);
         return merged;
+    }
+
+    /** Espera o resultado de um pedido; a falha volta como a exceção original (tratada em {@link #data}). */
+    private static <T> T await(Future<T> future) {
+        try {
+            return future.get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException re) throw re;
+            throw new IllegalStateException(e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Busca interrompida.", e);
+        }
+    }
+
+    private <T> T request(Callable<T> call) {
+        return await(requests.submit(call));
     }
 
     private static Instant hourOf(Reading r) {
@@ -145,12 +259,24 @@ public class ReadingService {
 
     /** Percentual de carga de uma bateria do sistema (null se indisponível). */
     public Double storagePct(StorageConfig s) {
-        Instant now = clock.instant();
         Cached<Double> cached = storageCache.get(s.name());
-        if (cached != null && cached.fetchedAt().plus(props.cacheTtl()).isAfter(now)) return cached.value();
+        if (fresh(cached, clock.instant())) return cached.value();
         if (s.channelId() == null) return null;
+        ReentrantLock lock = lockFor("storage:" + s.name());
+        lock.lock();
         try {
-            List<Feed> last = client.latest(s.channelId(), keyFor(s.readApiKey()), 1);
+            Instant now = clock.instant();
+            cached = storageCache.get(s.name());
+            if (fresh(cached, now)) return cached.value();
+            return fetchStorage(s, cached, now);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private Double fetchStorage(StorageConfig s, Cached<Double> cached, Instant now) {
+        try {
+            List<Feed> last = request(() -> client.latest(s.channelId(), keyFor(s.readApiKey()), 1));
             Double pct = last.isEmpty() ? null : s.conversion().battery(last.get(last.size() - 1).number(s.field()));
             storageCache.put(s.name(), new Cached<>(now, pct));
             return pct;

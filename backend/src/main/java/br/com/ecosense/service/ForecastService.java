@@ -33,6 +33,8 @@ import br.com.ecosense.service.ReadingService.DeviceData;
  *       estável ou subindo só conta como sustentável se o saldo não for negativo; senão o
  *       dispositivo fica com saldo negativo (deficit), sem número de dias, pois a capacidade da
  *       bateria em Wh não é conhecida.</li>
+ *   <li>Bateria caindo devagar (autonomia acima de {@value #LONG_AUTONOMY_DAYS} dias) com saldo positivo
+ *       também conta como sustentável: a queda é autodescarga/perdas, não falta de energia.</li>
  * </ol>
  * A confiança cai quanto mais os pontos fogem da reta, quanto menos pontos houver e quando a
  * tendência e o saldo apontam em direções opostas. Pode ser trocado por um modelo melhor sem
@@ -46,6 +48,10 @@ public class ForecastService {
     /** queda menor que isso (pontos % por dia) conta como estável */
     static final double SUSTAINABLE_SLOPE = -0.05;
     static final int MIN_CONFIDENCE = 40;
+    /** bateria caindo devagar (autodescarga, perdas) com coleta maior que o consumo: acima disso, sustentável */
+    static final int LONG_AUTONOMY_DAYS = 30;
+    /** hora "com geração": coleta acima desta fração do pico da janela (ignora ruído do sensor à noite) */
+    static final double GENERATING_FRACTION = 0.01;
     /** desconto na confiança quando bateria e saldo energético discordam */
     static final int DISAGREEMENT_PENALTY = 20;
 
@@ -71,8 +77,9 @@ public class ForecastService {
         DeviceData data = readings.data(d);
         Stats.Trend trend = trend(data);
         Double battery = data.latest() == null ? null : data.latest().battery();
+        Double sunHours = sunHours(d, data);
         if (!devices.isOnline(d, data) || trend == null || battery == null) {
-            return new ForecastItem(d.id(), null, false, false, null, null, d.sunHours());
+            return new ForecastItem(d.id(), null, false, false, null, null, sunHours);
         }
         Double balance = balanceWhDay(d, data);
         boolean falling = trend.slopePerDay() < SUSTAINABLE_SLOPE;
@@ -83,9 +90,39 @@ public class ForecastService {
         Double balanceOut = balance == null ? null : Stats.sig(balance);
         if (falling) {
             int daysLeft = (int) Math.max(1, Math.ceil(battery / -trend.slopePerDay()));
-            return new ForecastItem(d.id(), daysLeft, false, false, balanceOut, confidence, d.sunHours());
+            return new ForecastItem(d.id(), daysLeft, sustainableWhileFalling(daysLeft, balance), false,
+                    balanceOut, confidence, sunHours);
         }
-        return new ForecastItem(d.id(), null, !negativeBalance, negativeBalance, balanceOut, confidence, d.sunHours());
+        return new ForecastItem(d.id(), null, !negativeBalance, negativeBalance, balanceOut, confidence, sunHours);
+    }
+
+    /**
+     * Bateria caindo, mas coleta maior que o consumo e autonomia longa: a queda vem de autodescarga ou
+     * perdas, não de falta de energia, então o dispositivo se sustenta. Sem saldo medido não há como saber.
+     */
+    static boolean sustainableWhileFalling(int daysLeft, Double balanceWhDay) {
+        return balanceWhDay != null && balanceWhDay > 0 && daysLeft > LONG_AUTONOMY_DAYS;
+    }
+
+    /**
+     * Horas de sol por dia: a cadastrada no dispositivo ou, sem ela, as horas com geração medidas na
+     * janela da tendência (7 dias). Null se o canal não mede coleta ou há menos de um dia de leituras.
+     */
+    private Double sunHours(DeviceConfig d, DeviceData data) {
+        if (d.sunHours() != null) return d.sunHours();
+        if (!d.fields().measuresHarvested()) return null;
+        List<Double> harvested = DeviceService.since(data.hourly(), clock.instant().minus(Duration.ofHours(TREND_HOURS)))
+                .stream().map(Reading::harvestedW).filter(w -> w != null).toList();
+        return generatingHoursPerDay(harvested);
+    }
+
+    /** Média horária de coleta (W) → horas por dia com geração. Null com menos de 24 leituras. */
+    static Double generatingHoursPerDay(List<Double> hourlyHarvestedW) {
+        if (hourlyHarvestedW.size() < 24) return null;
+        double peak = hourlyHarvestedW.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+        if (peak <= 0) return 0d;
+        long generating = hourlyHarvestedW.stream().filter(w -> w > peak * GENERATING_FRACTION).count();
+        return Stats.round(generating * 24.0 / hourlyHarvestedW.size(), 1);
     }
 
     /** range: 24h (12 h passadas + 24 futuras, passo 1 h) ou 7d (3 dias passados + 7 futuros, passo 1 dia). */

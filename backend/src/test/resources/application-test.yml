@@ -18,6 +18,8 @@ ecosense:
   thingspeak:
     read-api-key:
     simulate: true
+  # sem carga em segundo plano: cada teste busca o que precisa (resultado previsível)
+  warm-up: false
   devices:
     - id: IOT-001
       name: Sensor Ambiental 01

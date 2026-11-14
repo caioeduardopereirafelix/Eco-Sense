@@ -50,8 +50,10 @@ public final class ApiDtos {
 
     public record Forecasts(String season, Instant updatedAt, List<ForecastItem> items) {}
     /**
-     * daysLeft: dias até esgotar (bateria caindo). sustainable: bateria estável/subindo e saldo não negativo.
+     * daysLeft: dias até esgotar (bateria caindo). sustainable: bateria estável/subindo e saldo não negativo,
+     * ou caindo devagar (mais de 30 dias) com saldo positivo — nesse caso daysLeft também vem preenchido.
      * deficit: bateria estável/subindo, mas consome mais do que coleta. balanceWhDay: coleta − consumo (Wh/dia).
+     * sunHours: horas de sol por dia, cadastradas ou medidas (horas com geração nos últimos 7 dias).
      */
     public record ForecastItem(String id, Integer daysLeft, boolean sustainable, boolean deficit,
                                Double balanceWhDay, Integer confidence, Double sunHours) {}
