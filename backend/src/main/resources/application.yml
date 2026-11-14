@@ -48,6 +48,8 @@ ecosense:
     read-api-key: ${THINGSPEAK_READ_API_KEY:}
   zone: America/Sao_Paulo
   cache-ttl: 60s
+  # carrega as leituras de todos os dispositivos assim que o back-end liga (a primeira tela abre rápido)
+  warm-up: true
   offline-after: 30m
   # origens do front-end autorizadas (CORS)
   cors-origins:

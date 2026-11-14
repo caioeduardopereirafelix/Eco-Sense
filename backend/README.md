@@ -42,6 +42,9 @@ Pré-requisitos: **JDK 21+** e **MySQL 8** rodando. O Maven vem junto (`mvnw`).
 
 Ao iniciar, o log mostra `Read API Key configurada (N caracteres)` (ou `NÃO configurada`) e, na
 primeira consulta com o banco vazio, `Banco vazio: 10 dispositivo(s) iniciais copiados da configuração`.
+Logo depois de ligar, o back-end baixa em segundo plano o histórico de todos os dispositivos (cerca de 10 s)
+e avisa `Leituras carregadas em N s`; a partir daí as telas abrem na hora. Uma tela aberta antes disso
+espera essa carga terminar (`ecosense.warm-up: false` desliga a carga ao ligar).
 Se aparecer `Access denied for user`, confira `MYSQL_USER`/`MYSQL_PASSWORD`.
 
 ## Login e perfis
@@ -128,7 +131,8 @@ mW → W; negativo inverte o sinal). Use `none` em `fields` para uma leitura que
 
 **Canais que enviam a cada poucos segundos:** o ThingSpeak lê no máximo 8000 entradas por pedido antes de
 calcular as médias. `history-chunk-days` divide a primeira carga do histórico em pedaços (ex.: `2` para um
-canal de 30 s); depois o back-end busca só as horas novas.
+canal de 30 s), buscados em paralelo (no máximo 6 pedidos ao mesmo tempo); depois o back-end busca só as
+horas novas.
 
 ### Canal próprio (privado)
 
@@ -160,7 +164,7 @@ do ThingSpeak para 10 dispositivos de teste.
 
 | O quê | Como |
 |---|---|
-| Leituras | Por dispositivo: última entrada (`results=1`) + médias por hora dos últimos 31 dias (`average=60`). Cache de 60 s (`cache-ttl`) para respeitar os limites do ThingSpeak. Se o ThingSpeak falhar, usa o último resultado em cache. |
+| Leituras | Por dispositivo: última entrada (`results=1`) + médias por hora dos últimos 31 dias (`average=60`). Cache de 60 s (`cache-ttl`) para respeitar os limites do ThingSpeak. Se o ThingSpeak falhar, usa o último resultado em cache. Cada dispositivo é buscado por uma requisição de cada vez: as outras esperam e usam o mesmo resultado. |
 | Online/Offline | Online se a última entrada for mais recente que `offline-after` (30 min) ou 3× o `tx-interval`, o que for maior. |
 | Consumo e coleta (Wh/dia) | Média de potência das últimas 24 h × 24. |
 | Energia (kWh) | Cada média horária (W) × 1 h, somadas no período. |

@@ -86,7 +86,8 @@ No Windows: `mvnw.cmd spring-boot:run`. No IntelliJ: rode a classe `EcoSenseAppl
 python -m http.server 5500
 ```
 
-Acesse `http://localhost:5500/login.html`.
+Acesse `http://localhost:5500/login.html`. Ao ligar, o back-end leva cerca de 10 s para baixar o histórico
+dos dispositivos do ThingSpeak (o log avisa `Leituras carregadas`); depois disso as telas abrem na hora.
 
 **4. Entre** com o e-mail e a senha de administrador do `.env`. Em **Usuários**, crie um usuário comum
 para ver o portal do outro perfil.
