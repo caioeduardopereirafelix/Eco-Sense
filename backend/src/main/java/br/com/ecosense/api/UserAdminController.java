@@ -23,7 +23,6 @@ import br.com.ecosense.api.ApiDtos.UserUpdate;
 import br.com.ecosense.security.AuthUser;
 import br.com.ecosense.service.UserService;
 
-/** Gestão de usuários — só administradores (regra em SecurityConfig). */
 @RestController
 @RequestMapping("/api/users")
 public class UserAdminController {

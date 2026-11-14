@@ -9,10 +9,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * Usuário do sistema (tabela {@code app_users}). A senha é guardada só como hash BCrypt.
- * {@code tokenVersion} sobe quando a senha muda: tokens emitidos antes deixam de valer.
- */
 @Entity
 @Table(name = "app_users")
 public class UserEntity {
@@ -29,7 +25,6 @@ public class UserEntity {
     private String name;
     @Column(nullable = false, length = 100)
     private String passwordHash;
-    /** ADMIN | USER */
     @Column(nullable = false, length = 10)
     private String role;
     @Column(nullable = false)

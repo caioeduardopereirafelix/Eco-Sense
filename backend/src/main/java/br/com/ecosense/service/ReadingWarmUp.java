@@ -7,12 +7,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Assim que o back-end termina de ligar, carrega em segundo plano as leituras de todos os dispositivos.
- * Sem isso, a primeira tela aberta esperaria o histórico de 31 dias de cada canal ser baixado do ThingSpeak.
- * Uma tela aberta durante a carga não repete os pedidos: espera e usa o mesmo resultado.
- * Desligue com {@code ecosense.warm-up=false} (os testes automáticos fazem isso).
- */
 @Component
 @ConditionalOnProperty(prefix = "ecosense", name = "warm-up", havingValue = "true", matchIfMissing = true)
 public class ReadingWarmUp {
@@ -41,7 +35,6 @@ public class ReadingWarmUp {
             log.info("Leituras carregadas em {} s: o painel já abre com os dados.",
                     String.format("%.1f", (System.nanoTime() - start) / 1e9));
         } catch (RuntimeException e) {
-            /* não impede o uso: as telas buscam os dados quando forem abertas */
             log.warn("Não foi possível carregar as leituras ao ligar: {}", e.getMessage());
         }
     }

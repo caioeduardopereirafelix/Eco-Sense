@@ -1,10 +1,3 @@
-# Configuração do back-end EcoSense: lê os canais do ThingSpeak e guarda o cadastro no MySQL.
-# Segredos (Read API Key e senha do MySQL) ficam no .env — veja backend/.env.example.
-#
-# Os dispositivos iniciais são canais PÚBLICOS de terceiros (não precisam de chave), escolhidos por
-# medirem coleta de energia, bateria e consumo. Cite as fontes no trabalho (lista no backend/README.md).
-# Páginas: https://thingspeak.mathworks.com/channels/<ID>
-
 server:
   port: ${PORT:8080}
 
@@ -12,16 +5,12 @@ spring:
   application:
     name: ecosense-backend
   config:
-    # Lê segredos de um arquivo .env (formato CHAVE=valor), se existir. Procura em backend/.env
-    # e em .env na pasta de onde o back-end foi iniciado. O .env NÃO vai para o git (.gitignore).
     import:
       - optional:file:.env[.properties]
       - optional:file:backend/.env[.properties]
   jackson:
     serialization:
       write-dates-as-timestamps: false
-  # Banco MySQL: guarda o cadastro dos dispositivos e as solicitações de manutenção.
-  # O banco "ecosense" e as tabelas são criados automaticamente se não existirem.
   datasource:
     url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC}
     username: ${MYSQL_USER:root}
@@ -29,29 +18,24 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update           # cria/atualiza as tabelas a partir das entidades
+      ddl-auto: update
     properties:
       hibernate.jdbc.time_zone: UTC
 
 ecosense:
-  # Login (perfis ADMIN e USER). Segredos no .env, nunca aqui.
   auth:
-    jwt-secret: ${JWT_SECRET:}                     # vazio = chave aleatória (logins caem ao reiniciar)
+    jwt-secret: ${JWT_SECRET:}
     token-ttl: 8h
-    # primeiro administrador, criado só quando ainda não há nenhum usuário no banco
     admin-email: ${ECOSENSE_ADMIN_EMAIL:admin@ecosense.local}
     admin-name: Administrador
-    admin-password: ${ECOSENSE_ADMIN_PASSWORD:}   # vazio = senha aleatória mostrada no log
+    admin-password: ${ECOSENSE_ADMIN_PASSWORD:}
   thingspeak:
     base-url: https://api.thingspeak.com
-    # Read API Key padrão (canais privados). Defina THINGSPEAK_READ_API_KEY no .env; vazio = só canais públicos.
     read-api-key: ${THINGSPEAK_READ_API_KEY:}
   zone: America/Sao_Paulo
   cache-ttl: 60s
-  # carrega as leituras de todos os dispositivos assim que o back-end liga (a primeira tela abre rápido)
   warm-up: true
   offline-after: 30m
-  # origens do front-end autorizadas (CORS)
   cors-origins:
     - http://localhost:5173
     - http://127.0.0.1:5173
@@ -59,44 +43,30 @@ ecosense:
     - http://127.0.0.1:5500
     - http://localhost:3000
 
-  # ------------------------------------------------------------------
-  # fields: em qual field do canal está cada leitura (field1..field8 ou none):
-  #   battery (%), consumption (W), temperature (°C), harvested (W) — após a conversão
-  # conversion: battery-voltage-min/max (V → %), consumption/harvested/temperature-scale (multiplicador)
-  # history-chunk-days: canais que enviam a cada poucos segundos precisam de pedidos menores (≈2)
-  # ------------------------------------------------------------------
-  # Dispositivos INICIAIS: copiados para o banco só na primeira execução (tabela vazia).
-  # Depois, adicione/edite/remova pelo painel admin → Dispositivos IoT.
   devices:
-    # Coletor de energia: painel solar 65 × 65 mm virado para o teto, numa sala voltada para o sul.
-    # Fields do canal: field1 Vbat (V), field2 Pbat (mW, negativo = bateria descarregando),
-    # field3 Vsol, field4 Psol (mW, potência do painel), field5–6 saída, field7–8 UPS.
     - id: IOT-001
       name: Harveo – coletor solar
       location: Laboratório EMBEDO (indoor)
       region: Gdańsk
       latitude: 54.424526
       longitude: 18.478837
-      tx-interval: 1                  # envia a cada ~30 s
+      tx-interval: 1
       type: Sensor
       priority: Alta
       harvesting-type: Solar
       channel-id: 2988514
-      history-chunk-days: 2           # envia a cada ~30 s: 8000 entradas ≈ 2,8 dias por pedido
+      history-chunk-days: 2
       fields:
-        battery: field1               # tensão da bateria (V) → % pela conversão abaixo
-        consumption: field2           # potência da bateria (mW); descarga = consumo
-        temperature: none             # o canal não mede temperatura
-        harvested: field4             # potência do painel solar (mW)
+        battery: field1
+        consumption: field2
+        temperature: none
+        harvested: field4
       conversion:
-        battery-voltage-min: 3.0      # Li-ion: 3,0 V ≈ vazia
-        battery-voltage-max: 4.2      #         4,2 V ≈ cheia
-        consumption-scale: -0.001     # mW → W e inverte o sinal (descarga negativa vira consumo positivo)
-        harvested-scale: 0.001        # mW → W
+        battery-voltage-min: 3.0
+        battery-voltage-max: 4.2
+        consumption-scale: -0.001
+        harvested-scale: 0.001
 
-    # Nó de sensores do mesmo laboratório: bateria do UPS, luz ambiente e clima.
-    # Fields do canal: field1 tensão UPS (mV), field2 carga UPS (%), field3–5 luz (lx),
-    # field6 temperatura (°C), field7 pressão (hPa), field8 umidade (%).
     - id: IOT-002
       name: EMBEDO Node – sensores
       location: Laboratório EMBEDO (indoor)
@@ -109,19 +79,11 @@ ecosense:
       channel-id: 3124603
       history-chunk-days: 2
       fields:
-        battery: field2               # carga do UPS (%)
+        battery: field2
         consumption: none
-        temperature: field6           # °C
+        temperature: field6
         harvested: none
 
-    # ---------------------------------------------------------------------------------------------
-    # Sistemas solares com bateria (canais públicos). Onde o canal mede só CORRENTE, a potência é
-    # estimada como corrente × tensão nominal da bateria (o *-scale abaixo). As faixas de tensão → %
-    # são aproximações para o tipo de bateria inferido dos dados (LiFePO4 12 V: 12,0–13,6 V; Li-ion: 3,0–4,2 V).
-    # ---------------------------------------------------------------------------------------------
-
-    # Usina solar pequena com bateria 12 V. Fields: f1 tensão da bateria (V), f2 corrente de carga
-    # solar (A), f3 corrente das cargas (A), f4 temperatura (°C), f5 chuva, f6 UV.
     - id: IOT-003
       name: Usina solar 12 V
       location: Elektrownia solarna
@@ -133,16 +95,14 @@ ecosense:
       priority: Alta
       harvesting-type: Solar
       channel-id: 1279978
-      history-chunk-days: 5           # envia a cada ~60 s: 8000 entradas ≈ 5,5 dias
+      history-chunk-days: 5
       fields: { battery: field1, consumption: field3, temperature: field4, harvested: field2 }
       conversion:
-        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-min: 12.0
         battery-voltage-max: 13.6
-        consumption-scale: 12.8       # A × 12,8 V ≈ W
+        consumption-scale: 12.8
         harvested-scale: 12.8
 
-    # Estação meteorológica solar (ESP8266 + INA219). Fields: f2 bateria (V), f3 temperatura (°C),
-    # f6 tensão do painel (V), f7 luminosidade (lx), f8 corrente da bateria (mA; positivo = descarga).
     - id: IOT-004
       name: Estação solar Yokohama
       location: Solar Weather Station (Outside2-17)
@@ -154,16 +114,14 @@ ecosense:
       priority: Média
       harvesting-type: Solar
       channel-id: 181889
-      history-chunk-days: 27          # envia a cada ~5 min: 8000 entradas ≈ 27 dias
+      history-chunk-days: 27
       fields: { battery: field2, consumption: field8, temperature: field3, harvested: field8 }
       conversion:
-        battery-voltage-min: 3.0      # Li-ion (estimativa)
+        battery-voltage-min: 3.0
         battery-voltage-max: 4.2
-        consumption-scale: 0.0038     # mA × 3,8 V / 1000 ≈ W (corrente positiva = descarga = consumo)
-        harvested-scale: -0.0038      # corrente negativa = carga vinda do painel
+        consumption-scale: 0.0038
+        harvested-scale: -0.0038
 
-    # Casa com 14,52 kWp de painéis solares e bateria. Fields: f2 carga da bateria (%), f3 potência da
-    # bateria (W), f4 produção solar (W), f7 consumo da casa (W); f1/f5 wallbox, f6 rede, f8 total.
     - id: IOT-005
       name: Casa solar 14,5 kWp
       location: PV-Anlage EFH Merlischachen
@@ -175,11 +133,9 @@ ecosense:
       priority: Alta
       harvesting-type: Solar
       channel-id: 107067
-      history-chunk-days: 2           # envia a cada ~30 s
+      history-chunk-days: 2
       fields: { battery: field2, consumption: field7, temperature: none, harvested: field4 }
 
-    # Banco de baterias com dois controladores solares. Fields: f1 corrente de descarga (A),
-    # f2 tensão (V), f3/f4 corrente dos controladores 1 e 2 (A). Só o controlador 1 entra na coleta.
     - id: IOT-006
       name: Banco solar Texas
       location: Solar Array
@@ -194,13 +150,11 @@ ecosense:
       history-chunk-days: 5
       fields: { battery: field2, consumption: field1, temperature: none, harvested: field3 }
       conversion:
-        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-min: 12.0
         battery-voltage-max: 13.6
-        consumption-scale: 13.2       # A × 13,2 V ≈ W
+        consumption-scale: 13.2
         harvested-scale: 13.2
 
-    # Fonte de energia solar com bateria. Fields: f1 temperatura do gabinete (°C), f2 tensão da
-    # bateria (V), f3 corrente da bateria (A; negativo = descarga, positivo = carga), f4 ventoinha.
     - id: IOT-007
       name: Estação de energia Nebraska
       location: PowerStationData
@@ -214,20 +168,11 @@ ecosense:
       channel-id: 285868
       fields: { battery: field2, consumption: field3, temperature: field1, harvested: field3 }
       conversion:
-        battery-voltage-min: 12.0     # LiFePO4 12 V (estimativa)
+        battery-voltage-min: 12.0
         battery-voltage-max: 13.6
-        consumption-scale: -13.2      # descarga (negativa) × 13,2 V → consumo em W
-        harvested-scale: 13.2         # carga (positiva) × 13,2 V → coleta em W
+        consumption-scale: -13.2
+        harvested-scale: 13.2
 
-    # ---------------------------------------------------------------------------------------------
-    # Exemplos OFFLINE: canais públicos que pararam de transmitir. Mostram como o EcoSense reage:
-    # status Offline, última comunicação antiga, alerta "Dispositivo offline", sem previsão nem
-    # histórico recente. A bateria exibida é a da última leitura recebida.
-    # ---------------------------------------------------------------------------------------------
-
-    # Coletor DFRobot SPV1050 do experimento comparativo do laboratório EMBEDO (parou em 07/2026).
-    # Fields: f1 tensão da bateria DFRobot (V), f2 potência da bateria (mW), f3 tensão do painel (V),
-    # f4 potência do painel (mW); f5–f8 = mesmas leituras do Harveo.
     - id: IOT-008
       name: DFRobot SPV1050 – coletor solar
       location: Laboratório EMBEDO (indoor)
@@ -241,14 +186,11 @@ ecosense:
       channel-id: 3124605
       fields: { battery: field1, consumption: field2, temperature: none, harvested: field4 }
       conversion:
-        battery-voltage-min: 3.0      # Li-ion
+        battery-voltage-min: 3.0
         battery-voltage-max: 4.2
-        consumption-scale: -0.001     # mW → W, descarga (negativa) = consumo
+        consumption-scale: -0.001
         harvested-scale: 0.001
 
-    # Bateria + painel de uma estação meteorológica em Raspberry Pi (parou em 03/2021, bateria descarregada).
-    # Fields: f1 tensão da bateria (V), f2 tensão do painel (V), f3 temperatura da CPU, f4 corrente de carga (mA),
-    # f5 temperatura (°C), f6 corrente do painel (mA), f7 tensão da carga (V), f8 corrente da carga (mA, negativa).
     - id: IOT-009
       name: Estação meteorológica Volta
       location: Volta
@@ -262,13 +204,11 @@ ecosense:
       channel-id: 1085833
       fields: { battery: field1, consumption: field8, temperature: field5, harvested: field6 }
       conversion:
-        battery-voltage-min: 11.6     # chumbo-ácido 12 V (estimativa)
+        battery-voltage-min: 11.6
         battery-voltage-max: 12.9
-        consumption-scale: -0.0108    # mA × 10,8 V / 1000 ≈ W (corrente da carga é negativa)
+        consumption-scale: -0.0108
         harvested-scale: 0.0108
 
-    # Repetidor Wi-Fi alimentado por energia solar (parou em 07/2017, bateria baixa).
-    # Fields: f1 tensão da bateria (V), f2 corrente da bateria (A, negativa = descarga).
     - id: IOT-010
       name: Repetidor Wi-Fi solar
       location: SolarWiFiRepeater
@@ -282,23 +222,11 @@ ecosense:
       channel-id: 33748
       fields: { battery: field1, consumption: field2, temperature: none, harvested: field2 }
       conversion:
-        battery-voltage-min: 11.6     # chumbo-ácido 12 V (estimativa)
+        battery-voltage-min: 11.6
         battery-voltage-max: 12.9
-        consumption-scale: -12        # descarga (negativa) × 12 V → W
-        harvested-scale: 12           # carga (positiva) × 12 V → W
+        consumption-scale: -12
+        harvested-scale: 12
 
-    # Para incluir o seu próprio canal (3574018, "EcoSense - Sensor 01"), descomente:
-    # - id: IOT-011
-    #   name: Sensor 01
-    #   location: A definir
-    #   region: A definir
-    #   tx-interval: 1
-    #   harvesting-type: Solar
-    #   channel-id: 3574018
-    #   fields: { battery: field1, consumption: field2, temperature: field3, harvested: field4 }
-
-  # Armazenamento do sistema: banco de baterias LiFePO4 de 8 células (~8 kWh).
-  # field1 = tensão da célula 1 (V). LiFePO4 tem curva plana: 3,0–3,4 V é uma aproximação linear da carga.
   storage:
     - name: Solarakku
       type: LiFePO4 24 V / 320 Ah
