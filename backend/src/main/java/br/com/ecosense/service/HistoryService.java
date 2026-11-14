@@ -17,7 +17,7 @@ import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 
 /**
- * Histórico agregado de todos os dispositivos.
+ * Histórico agregado dos dispositivos (todos ou de uma categoria).
  * Cada leitura horária do ThingSpeak é a média de potência (W) naquela hora, então a energia da
  * hora é W × 1 h; somando as horas de um período obtém-se a energia do período (kWh = Wh / 1000).
  */
@@ -36,8 +36,11 @@ public class HistoryService {
         this.clock = clock;
     }
 
-    /** range: hoje | 7d | 30d | custom (custom exige from e to, até {@value ReadingService#HISTORY_DAYS} dias). */
-    public History history(String range, LocalDate from, LocalDate to) {
+    /**
+     * range: hoje | 7d | 30d | custom (custom exige from e to, até {@value ReadingService#HISTORY_DAYS} dias).
+     * group: categoria de dispositivos somada (ALL = todos).
+     */
+    public History history(String range, LocalDate from, LocalDate to, DeviceGroup group) {
         Instant now = clock.instant();
         LocalDate today = LocalDate.ofInstant(now, props.zone());
         boolean hourly = "hoje".equals(range);
@@ -59,7 +62,7 @@ public class HistoryService {
             default -> throw ApiException.badRequest("Período de histórico inválido. Use hoje, 7d, 30d ou custom.");
         }
 
-        List<List<Reading>> perDevice = devices.configs().stream().map(d -> readings.data(d).hourly()).toList();
+        List<List<Reading>> perDevice = devices.configs(group).stream().map(d -> readings.data(d).hourly()).toList();
         List<Instant> timestamps = new ArrayList<>();
         List<Double> generated = new ArrayList<>(), consumed = new ArrayList<>(), storage = new ArrayList<>();
         for (int i = 0; i < points; i++) {

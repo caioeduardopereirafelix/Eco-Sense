@@ -69,6 +69,26 @@ function timeAgo(iso){
 /* alerta: level 'critical' | 'high' | 'warning' | 'info' define cor e ícone */
 const ALERT_ICONS={critical:'🔴',high:'🟠',warning:'🟡',info:'🟢'};
 const alertHTML=a=>`<div class="alert a-${esc(a.level)}${a.read?' read':''}"><span aria-hidden="true">${ALERT_ICONS[a.level]||'⚪'}</span><div><b>${esc(a.title)}</b><div class="mu">${esc(a.message)} · ${esc(timeAgo(a.createdAt))}</div></div>${a.read?'':`<button class="btn" data-read="${esc(a.id)}">Marcar como lido</button>`}</div>`;
+/* ---------- grupo de dispositivos ----------
+   Sensores IoT geram mW/mWh; sistemas de energia (instalações solares, residências) geram W/kWh.
+   Somados, os sistemas escondem os sensores, então os totais podem ser vistos por grupo, cada um na
+   própria escala. A escolha vale para todas as telas com o filtro e fica guardada neste navegador. */
+const GROUPS=[['todos','Todos'],['iot','Dispositivos IoT'],['sistemas','Sistemas de energia']];
+const GROUP_INFO={todos:'Todos os dispositivos somados.',iot:'Sensores e equipamentos que se alimentam da energia que coletam.',sistemas:'Instalações solares e residências monitoradas.'};
+const GROUP_LABEL={iot:'IoT',sistemas:'Sistema de energia'};
+let group='todos';
+try{const g=localStorage.getItem('eh-group');if(GROUPS.some(([k])=>k===g))group=g}catch(e){}
+/* recarrega a tela atual mantendo rolagem e estado (definida em startApp) */
+let rerender=()=>{};
+function groupFilter(){
+ const r=filters(GROUPS,group,k=>{if(k===group)return;group=k;
+  try{localStorage.setItem('eh-group',k)}catch(e){}
+  r.querySelectorAll('[data-k]').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  r.querySelector('.mu').textContent=GROUP_INFO[k];
+  rerender()});
+ r.setAttribute('role','group');r.setAttribute('aria-label','Grupo de dispositivos');
+ r.insertAdjacentHTML('beforeend',`<span class="mu" style="font-size:13px">${GROUP_INFO[group]}</span>`);
+ return r}
 function filters(opts,cur,cb){const r=document.createElement('div');r.className='row';r.innerHTML=opts.map(([k,l])=>`<button class="btn${k===cur?' on':''}" data-k="${k}">${l}</button>`).join('');r.onclick=e=>{const k=e.target.dataset.k;if(k)cb(k)};return r}
 const kvRow=(l,v)=>`<dt>${l}</dt><dd>${v}</dd>`;
 /* ---------- atualização automática ----------
@@ -168,6 +188,7 @@ function startApp(NAV,pages,{staticPages=[],role}={}){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
  for(const ev of['pointerdown','keydown','input','wheel'])V.addEventListener(ev,()=>{lastTouch=Date.now()},{passive:true});
  window.addEventListener('hashchange',go);
+ rerender=()=>go(true);
  $('#menu').onclick=()=>$('#side').classList.toggle('open');
  function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.setItem('eh-theme',t)}catch(e){}}
  let t0='dark';try{t0=localStorage.getItem('eh-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}

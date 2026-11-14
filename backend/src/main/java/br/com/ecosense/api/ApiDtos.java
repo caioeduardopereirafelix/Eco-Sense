@@ -29,7 +29,11 @@ public final class ApiDtos {
     public record Storage(Integer pct, Double storedKwh, Double capacityKwh, String status) {}
     public record DeviceCount(int total, int online, int offline) {}
 
-    public record Source(String name, double energyKwh, Double efficiencyPct, String status, Instant updatedAt) {}
+    /** devices: participação de cada dispositivo na energia de hoje desta fonte, do maior para o menor. */
+    public record Source(String name, double energyKwh, Double efficiencyPct, String status, Instant updatedAt,
+                         List<SourceDevice> devices) {}
+    /** group: iot | sistemas. sharePct: % da energia da fonte (null quando a fonte não gerou nada hoje). */
+    public record SourceDevice(String id, String name, String group, double energyKwh, Double sharePct) {}
     /** currentW/avgW são null quando o canal não mede consumo. */
     public record Load(String name, String type, Double currentW, Double avgW, String priority, String status) {}
     public record Battery(String name, String type, double capacityKwh, Integer pct, String status) {}
