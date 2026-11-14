@@ -81,7 +81,20 @@ O administrador não pode remover a si mesmo nem mudar o próprio perfil (assim 
 
 Todos implementados em `backend/` (`ApiController`). Exigem login (ver acima).
 
-### `GET /api/overview` → `api.getOverview()`
+### Grupos de dispositivos (`?group=`)
+
+Sensores IoT geram energia na escala de mW/mWh; instalações solares e residências, de W/kWh. Somados,
+os sistemas escondem os sensores. Por isso `overview`, `sources` e `history` aceitam `group`:
+
+| `group` | Dispositivos |
+|---|---|
+| `todos` (padrão, ou ausente) | todos |
+| `iot` | tipo diferente de "Sistema solar" e "Residência" (sensores, comunicação, atuadores…) |
+| `sistemas` | tipo "Sistema solar" ou "Residência" |
+
+O grupo vem do campo `type` do cadastro. Valor desconhecido: `400 {"message": "Grupo inválido. Use todos, iot ou sistemas."}`.
+
+### `GET /api/overview?group=` → `api.getOverview(group)`
 ```json
 {
   "generation":  { "todayKwh": 4.82, "changePct": 8.4 },
@@ -92,13 +105,19 @@ Todos implementados em `backend/` (`ApiController`). Exigem login (ver acima).
 ```
 `changePct` = variação em relação a ontem no mesmo horário (negativo = queda; `null` sem dados de ontem).
 `storage`: com baterias do sistema cadastradas, carga ponderada pela capacidade; sem elas, `pct` é a média
-das baterias dos dispositivos e `storedKwh`/`capacityKwh` vêm `null`.
+das baterias dos dispositivos e `storedKwh`/`capacityKwh` vêm `null`. As baterias do sistema são de
+instalações de energia: com `group=iot` vale sempre a média dos dispositivos.
+`devices` conta só os dispositivos do grupo.
 
-### `GET /api/sources` → `api.getSources()`
+### `GET /api/sources?group=` → `api.getSources(group)`
 ```json
-[{ "name": "Solar", "energyKwh": 3.4, "efficiencyPct": 18.2, "status": "Normal", "updatedAt": "2026-11-10T14:04:00Z" }]
+[{ "name": "Solar", "energyKwh": 3.4, "efficiencyPct": 18.2, "status": "Normal", "updatedAt": "2026-11-10T14:04:00Z",
+   "devices": [{ "id": "IOT-005", "name": "Casa solar 14,5 kWp", "group": "sistemas", "energyKwh": 2.9, "sharePct": 85.3 },
+               { "id": "IOT-001", "name": "Harveo – coletor solar", "group": "iot", "energyKwh": 7.1E-6, "sharePct": 0.0 }] }]
 ```
-Uma fonte por tipo de coleta, somando a energia de hoje dos dispositivos daquele tipo. `efficiencyPct` é `null`
+Uma fonte por tipo de coleta, somando a energia de hoje dos dispositivos daquele tipo (no grupo pedido).
+`devices`: participação de cada dispositivo na energia da fonte, do maior para o menor; `group` é `iot` ou
+`sistemas`; `sharePct` é `null` quando a fonte ainda não gerou nada hoje. `efficiencyPct` é `null`
 enquanto não houver medição da energia disponível no ambiente.
 
 ### `GET /api/loads` → `api.getLoads()`
@@ -164,7 +183,7 @@ contradizem. `sunHours` = horas de sol por dia no local (`null` se o dispositivo
 `step: "day"`. `timestamps[nowIndex]` é o momento atual. `measured` é `null` no futuro; `battery.predicted`
 é `null` no passado. Consumo em Wh, bateria em %.
 
-### `GET /api/history?range=hoje|7d|30d|custom` → `api.getHistory(range)`
+### `GET /api/history?range=hoje|7d|30d|custom&group=` → `api.getHistory(range, {from, to, group})`
 ```json
 {
   "step": "hour",

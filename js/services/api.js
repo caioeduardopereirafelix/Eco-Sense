@@ -33,11 +33,12 @@ const api={
  updateMe:name=>http('/me',{method:'PUT',body:{name}}),
  changePassword:(currentPassword,newPassword)=>http('/me/password',{method:'PUT',body:{currentPassword,newPassword}}),
  /* energia e dispositivos */
- getOverview:()=>http('/overview'),getSources:()=>http('/sources'),getLoads:()=>http('/loads'),
+ /* group: todos | iot | sistemas (padrão: todos) */
+ getOverview:group=>http(`/overview${query({group})}`),getSources:group=>http(`/sources${query({group})}`),getLoads:()=>http('/loads'),
  getBatteries:()=>http('/batteries'),getDevices:()=>http('/devices'),getAlerts:()=>http('/alerts'),
  getForecasts:()=>http('/forecasts'),
  getForecastSeries:(id,range)=>http(`/devices/${encodeURIComponent(id)}/forecast${query({range})}`),
- getHistory:(range,{from,to}={})=>http(`/history${query({range,from,to})}`),
+ getHistory:(range,{from,to,group}={})=>http(`/history${query({range,from,to,group})}`),
  /* cadastro de dispositivos (admin) */
  getDeviceSettings:id=>http(`/devices/${encodeURIComponent(id)}/settings`),
  createDevice:s=>http('/devices',{method:'POST',body:s}),

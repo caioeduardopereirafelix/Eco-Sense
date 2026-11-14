@@ -1,7 +1,7 @@
 /* ===== PAINEL ADMIN (futura rota /admin) ===== */
 /* ===== 4. TELAS ===== */
 const pages={
-async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(),api.getAlerts(),api.getHistory('hoje')]);
+async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(group),api.getAlerts(),api.getHistory('hoje',{group})]);
  V.innerHTML=`<div class="grid">
  <div class="card"><h3>Energia gerada</h3><div class="big">${bigKwh(o.generation.todayKwh)}</div>${changeText(o.generation.changePct,true)}</div>
  <div class="card"><h3>Energia consumida</h3><div class="big">${bigPower(o.consumption.nowW)} <small>agora</small></div><div class="mu">Período: ${kwh(o.consumption.todayKwh)} · ${changeText(o.consumption.changePct,false,'')}</div></div>
@@ -10,14 +10,17 @@ async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(),api.getAlert
  <div class="grid g2"><div class="card"><h3>Gerada × consumida hoje (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>
  <div class="card"><h3>Nível de armazenamento hoje (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
  <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
+ V.prepend(groupFilter());
  const drawAlerts=()=>{$('#recent').innerHTML=a.length?withRead(a).slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
  V.onclick=e=>{const b=e.target.closest('[data-read]');if(b){readIds.add(b.dataset.read);drawAlerts()}};
  drawAlerts();
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  chart('c2','line',historyLabels(h),[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})},
-async geracao(){const s=await api.getSources(),h=await api.getHistory('7d');
+async geracao(){const[s,h]=await Promise.all([api.getSources(group),api.getHistory('7d',{group})]);
  V.innerHTML=`<div class="grid">${s.map(x=>sourceCard(x,{showUpdated:true})).join('')}</div>
+ ${shareCard(s)}
  <div class="card"><h3>Geração ao longo da semana (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>`;
+ V.prepend(groupFilter());
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Total gerado',historyEnergy(h).gen)])},
 async consumo(){const l=await api.getLoads();
  V.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>

@@ -36,6 +36,11 @@ public class DeviceService {
         return catalog.all();
     }
 
+    /** Dispositivos de uma categoria (ALL = todos). */
+    public List<DeviceConfig> configs(DeviceGroup group) {
+        return catalog.all().stream().filter(group::includes).toList();
+    }
+
     public DeviceConfig config(String id) {
         return catalog.find(id)
                 .orElseThrow(() -> ApiException.notFound("Dispositivo " + id + " não encontrado."));

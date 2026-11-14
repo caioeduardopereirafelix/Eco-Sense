@@ -31,6 +31,7 @@ import br.com.ecosense.api.ApiDtos.NewMaintenanceRequest;
 import br.com.ecosense.api.ApiDtos.Overview;
 import br.com.ecosense.api.ApiDtos.Source;
 import br.com.ecosense.security.AuthUser;
+import br.com.ecosense.service.DeviceGroup;
 import br.com.ecosense.service.DeviceService;
 import br.com.ecosense.service.EnergyService;
 import br.com.ecosense.service.ForecastService;
@@ -57,14 +58,15 @@ public class ApiController {
         this.maintenance = maintenance;
     }
 
+    /** group: todos (padrão) | iot | sistemas — ver DeviceGroup. */
     @GetMapping("/overview")
-    public Overview overview() {
-        return energy.overview();
+    public Overview overview(@RequestParam(required = false) String group) {
+        return energy.overview(DeviceGroup.parse(group));
     }
 
     @GetMapping("/sources")
-    public List<Source> sources() {
-        return energy.sources();
+    public List<Source> sources(@RequestParam(required = false) String group) {
+        return energy.sources(DeviceGroup.parse(group));
     }
 
     @GetMapping("/loads")
@@ -106,8 +108,9 @@ public class ApiController {
     public History history(
             @RequestParam(defaultValue = "hoje") String range,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return history.history(range, from, to);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String group) {
+        return history.history(range, from, to, DeviceGroup.parse(group));
     }
 
     @GetMapping("/maintenance-requests")

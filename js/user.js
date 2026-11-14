@@ -34,9 +34,10 @@ const needsAttention=(d,f)=>d.status==='Offline'||d.battery<20||(f.daysLeft!=nul
 const pages={
 async inicio(){
  alertsBase=null; /* busca alertas novos a cada carga (inclusive na atualização automática) */
- const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje')]);
+ const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(group),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje',{group})]);
  const fById=byId(fc.items);
- const needs=devices.filter(d=>needsAttention(d,fById[d.id])),online=devices.filter(d=>d.status==='Online').length;
+ /* o aviso de atenção vale para todos os dispositivos; os cards seguem o grupo escolhido */
+ const needs=devices.filter(d=>needsAttention(d,fById[d.id]));
  const banner=needs.length
   ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção. <a href="#dispositivos">Ver meus dispositivos</a></div>`
   :'<div class="banner" style="border-color:var(--ok)">Tudo certo com os seus dispositivos.</div>';
@@ -44,9 +45,10 @@ async inicio(){
   <div class="card"><h3>Energia gerada hoje</h3><div class="big">${bigKwh(o.generation.todayKwh)}</div>${changeText(o.generation.changePct,true)}</div>
   <div class="card"><h3>Consumo agora</h3><div class="big">${bigPower(o.consumption.nowW)}</div><div class="mu">Hoje: ${kwh(o.consumption.todayKwh)}</div></div>
   <div class="card"><h3>Bateria armazenada</h3><div class="big">${o.storage.pct==null?"—":num(o.storage.pct)}<small>%</small></div>${bar(o.storage.pct||0,'var(--sto)')}<div class="mu">${storageText(o.storage)}</div></div>
-  <div class="card"><h3>Dispositivos online</h3><div class="big">${online} <small>de ${devices.length}</small></div><div class="mu">${devices.length-online} offline</div></div></div>
+  <div class="card"><h3>Dispositivos online</h3><div class="big">${num(o.devices.online)} <small>de ${num(o.devices.total)}</small></div><div class="mu">${num(o.devices.offline)} offline</div></div></div>
   <div class="card" style="margin-bottom:16px"><h3>Gerada × consumida hoje (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>
   <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
+ V.firstElementChild.after(groupFilter());
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  const drawAlerts=async()=>{const l=await userAlerts();$('#recent').innerHTML=l.length?l.slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
  bindAlerts(drawAlerts);await drawAlerts()},
@@ -103,13 +105,15 @@ async dispositivos(){
 previsao:()=>renderForecast(),
 
 async energia(){
- const [s,b,l]=await Promise.all([api.getSources(),api.getBatteries(),api.getLoads()]);
- V.innerHTML=`<h2 class="sec">De onde vem a energia</h2>
+ const [s,b,l]=await Promise.all([api.getSources(group),api.getBatteries(),api.getLoads()]);
+ V.innerHTML=`<h2 class="sec">De onde vem a energia</h2><div id="grp"></div>
   <div class="grid">${s.map(x=>sourceCard(x)).join('')}</div>
+  ${shareCard(s)}
   <h2 class="sec">Armazenamento</h2>
   <div class="grid g2">${b.map(batteryCard).join('')}</div>
   <h2 class="sec">Maiores consumidores agora</h2>
-  <div class="card">${topConsumers(l)}</div>`},
+  <div class="card">${topConsumers(l)}</div>`;
+ $('#grp').replaceWith(groupFilter())},
 
 historico:()=>renderHistory(),
 

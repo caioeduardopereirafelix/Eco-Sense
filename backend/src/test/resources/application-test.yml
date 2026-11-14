@@ -79,13 +79,13 @@ ecosense:
       priority: Média
       channel-id: 1000005
     - id: IOT-006
-      name: Estação Meteorológica
+      name: Usina Solar Norte
       location: Topo da colina
       region: Norte
       latitude: -15.7810
       longitude: -47.8910
       tx-interval: 10
-      type: Sensor
+      type: Sistema solar
       priority: Média
       harvesting-type: Solar
       sun-hours: 6.8
@@ -151,7 +151,8 @@ test-sim:
     1000003: { battery: 9, trend-per-day: -4, consumption-w: 0.38, harvested-w: 0.17, temperature: 31 }
     1000004: { battery: 92, trend-per-day: 0.1, consumption-w: 2.0, harvested-w: 2.17, temperature: 36 }
     1000005: { battery: 61, trend-per-day: -12, consumption-w: 3.08, temperature: 29 }
-    1000006: { battery: 78, trend-per-day: 0.3, consumption-w: 0.92, harvested-w: 1.04, temperature: 18 }
+    # 1000006: sistema solar (escala de W/kWh), mil vezes maior que os sensores
+    1000006: { battery: 78, trend-per-day: 0.3, consumption-w: 920, harvested-w: 1040, temperature: 18 }
     1000007: { battery: 3, trend-per-day: -5, consumption-w: 4, harvested-w: 0.5, temperature: 26, offline-minutes: 180 }
     1000008: { battery: 18, trend-per-day: -3, consumption-w: 0.25, harvested-w: 0.12, temperature: 21 }
     1000009: { battery: 2, trend-per-day: -2, consumption-w: 0.25, harvested-w: 0.05, temperature: 20, offline-minutes: 1440 }

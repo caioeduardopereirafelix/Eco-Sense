@@ -133,6 +133,61 @@ class ApiControllerTest {
                 .andExpect(jsonPath("$[0].level").value("critical"));
     }
 
+    /* IOT-006 é o único "Sistema solar" (application-test.yml); os outros 9 contam como IoT */
+    @Test
+    void visaoGeralPorGrupo() throws Exception {
+        mvc.perform(get("/api/overview").param("group", "iot"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.devices.total").value(9))
+                /* baterias do sistema são de instalações de energia: no grupo IoT vale a média dos dispositivos */
+                .andExpect(jsonPath("$.storage.capacityKwh").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.storage.pct").isNumber());
+        mvc.perform(get("/api/overview").param("group", "sistemas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.devices.total").value(1))
+                .andExpect(jsonPath("$.devices.online").value(1))
+                .andExpect(jsonPath("$.storage.capacityKwh").value(10.0));
+        mvc.perform(get("/api/overview").param("group", "todos"))
+                .andExpect(jsonPath("$.devices.total").value(10));
+    }
+
+    @Test
+    void historicoPorGrupoSomaOTotal() throws Exception {
+        /* [5] = ontem, sempre completo */
+        double all = yesterdayGenerated(""), iot = yesterdayGenerated("iot"), systems = yesterdayGenerated("sistemas");
+        org.assertj.core.api.Assertions.assertThat(iot + systems)
+                .isCloseTo(all, org.assertj.core.api.Assertions.within(all * 0.01));
+        /* o sistema solar gera ~1000× mais: somado, esconde os sensores */
+        org.assertj.core.api.Assertions.assertThat(systems).isGreaterThan(iot * 100);
+    }
+
+    private double yesterdayGenerated(String group) throws Exception {
+        String body = mvc.perform(get("/api/history").param("range", "7d").param("group", group))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return ((Number) com.jayway.jsonpath.JsonPath.read(body, "$.generatedKwh[5]")).doubleValue();
+    }
+
+    @Test
+    void fontesTrazemParticipacaoDeCadaDispositivo() throws Exception {
+        mvc.perform(get("/api/sources"))
+                .andExpect(status().isOk())
+                /* Solar: IOT-001, 002, 003, 004, 006 e 007 */
+                .andExpect(jsonPath("$[0].devices", hasSize(6)))
+                .andExpect(jsonPath("$[0].devices[?(@.id == 'IOT-006')].group").value(org.hamcrest.Matchers.contains("sistemas")))
+                .andExpect(jsonPath("$[0].devices[?(@.id == 'IOT-001')].group").value(org.hamcrest.Matchers.contains("iot")));
+        mvc.perform(get("/api/sources").param("group", "iot"))
+                .andExpect(jsonPath("$[0].devices", hasSize(5)))
+                .andExpect(jsonPath("$[0].devices[?(@.id == 'IOT-006')]").isEmpty());
+    }
+
+    @Test
+    void grupoInvalido() throws Exception {
+        mvc.perform(get("/api/overview").param("group", "xyz"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Grupo inválido. Use todos, iot ou sistemas."));
+    }
+
     @Test
     void errosVoltamComMensagem() throws Exception {
         mvc.perform(get("/api/history").param("range", "ano"))

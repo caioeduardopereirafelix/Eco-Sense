@@ -24,6 +24,7 @@ import br.com.ecosense.api.ApiDtos.Generation;
 import br.com.ecosense.api.ApiDtos.Load;
 import br.com.ecosense.api.ApiDtos.Overview;
 import br.com.ecosense.api.ApiDtos.Source;
+import br.com.ecosense.api.ApiDtos.SourceDevice;
 import br.com.ecosense.api.ApiDtos.Storage;
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
@@ -53,8 +54,9 @@ public class EnergyService {
 
     /* ---------------- visão geral ---------------- */
 
-    public Overview overview() {
-        List<DeviceConfig> all = devices.configs();
+    /** Totais de uma categoria de dispositivos (ALL = todos). */
+    public Overview overview(DeviceGroup group) {
+        List<DeviceConfig> all = devices.configs(group);
         Period p = period();
         double genToday = history.energyKwh(all, p.todayStart, p.now, Reading::harvestedW);
         double genYesterday = history.energyKwh(all, p.yesterdayStart, p.sameTimeYesterday, Reading::harvestedW);
@@ -75,14 +77,17 @@ public class EnergyService {
         return new Overview(
                 new Generation(Stats.sig(genToday), change(genToday, genYesterday)),
                 new Consumption(Stats.sig(nowW), Stats.sig(conToday), change(conToday, conYesterday)),
-                storage(deviceBatteries),
+                storage(deviceBatteries, group),
                 new DeviceCount(all.size(), online, all.size() - online));
     }
 
-    /** Com baterias do sistema configuradas: carga ponderada pela capacidade. Sem elas: média dos dispositivos. */
-    private Storage storage(List<Double> deviceBatteries) {
+    /**
+     * Com baterias do sistema configuradas: carga ponderada pela capacidade. Sem elas: média dos dispositivos.
+     * As baterias do sistema são bancos de instalações de energia, então não entram no grupo IoT.
+     */
+    private Storage storage(List<Double> deviceBatteries, DeviceGroup group) {
         double stored = 0, capacity = 0;
-        for (StorageConfig s : props.storage()) {
+        for (StorageConfig s : group == DeviceGroup.IOT ? List.<StorageConfig>of() : props.storage()) {
             Double pct = readings.storagePct(s);
             if (pct == null) continue;
             stored += pct / 100 * s.capacityKwh();
@@ -99,22 +104,34 @@ public class EnergyService {
 
     /* ---------------- fontes, cargas e baterias ---------------- */
 
-    /** Uma fonte por tipo de coleta (Solar, Térmico…), somando os dispositivos daquele tipo. */
-    public List<Source> sources() {
+    /**
+     * Uma fonte por tipo de coleta (Solar, Térmico…), somando os dispositivos daquele tipo na categoria
+     * pedida, com a participação de cada dispositivo.
+     */
+    public List<Source> sources(DeviceGroup group) {
         Period p = period();
         Map<String, List<DeviceConfig>> byType = new LinkedHashMap<>();
-        for (DeviceConfig d : devices.configs()) {
+        for (DeviceConfig d : devices.configs(group)) {
             if (d.harvestingType() != null) byType.computeIfAbsent(d.harvestingType(), k -> new ArrayList<>()).add(d);
         }
         List<Source> result = new ArrayList<>();
         byType.forEach((type, configs) -> {
-            double kwh = history.energyKwh(configs, p.todayStart, p.now, Reading::harvestedW);
+            Map<DeviceConfig, Double> perDevice = new LinkedHashMap<>();
+            for (DeviceConfig d : configs) {
+                perDevice.put(d, history.energyKwh(List.of(d), p.todayStart, p.now, Reading::harvestedW));
+            }
+            double kwh = perDevice.values().stream().mapToDouble(Double::doubleValue).sum();
+            List<SourceDevice> shares = perDevice.entrySet().stream()
+                    .sorted(Map.Entry.<DeviceConfig, Double>comparingByValue().reversed())
+                    .map(e -> new SourceDevice(e.getKey().id(), e.getKey().name(), DeviceGroup.of(e.getKey()).param(),
+                            Stats.sig(e.getValue()), kwh > 0 ? Stats.round(e.getValue() / kwh * 100, 1) : null))
+                    .toList();
             boolean anyOnline = configs.stream().anyMatch(d -> devices.isOnline(d, readings.data(d)));
             Instant updatedAt = configs.stream().map(d -> readings.data(d).latest()).filter(Objects::nonNull)
                     .map(Reading::at).max(Comparator.naturalOrder())
                     .map(t -> t.truncatedTo(ChronoUnit.SECONDS)).orElse(null);
             /* eficiência exige saber a energia disponível no ambiente; null até existir esse dado */
-            result.add(new Source(type, Stats.sig(kwh), null, anyOnline ? "Normal" : "Atenção", updatedAt));
+            result.add(new Source(type, Stats.sig(kwh), null, anyOnline ? "Normal" : "Atenção", updatedAt, shares));
         });
         return result;
     }

@@ -28,6 +28,21 @@ const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}
 
 /* ---------- energia: fontes, baterias e consumidores ---------- */
 const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${bigKwh(x.energyKwh)}</div><div class="mu">Eficiência ${pct(x.efficiencyPct)} · ${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
+/* Participação de cada dispositivo na geração de hoje (s = resposta de api.getSources(group)).
+   Mostra de onde vem o total: um sistema solar pode responder por quase tudo. */
+const shareCard=s=>{
+ const multi=s.length>1;
+ const all=s.flatMap(x=>x.devices.map(d=>({...d,source:x.name}))).sort((a,b)=>b.energyKwh-a.energyKwh);
+ const rows=all.filter(d=>d.energyKwh>0),idle=all.filter(d=>!(d.energyKwh>0));
+ /* parcela pequena, mas não zero (ex.: sensor em mWh ao lado de uma casa em kWh): "< 0,1%" */
+ const share=d=>d.sharePct==null?null:`${d.sharePct===0?'< 0,1%':pct(d.sharePct)}${multi?` de ${d.source}`:''}`;
+ const row=d=>{const info=[group==='todos'&&GROUP_LABEL[d.group],kwh(d.energyKwh),share(d)].filter(Boolean).map(esc).join(' · ');
+  return `<div style="margin-bottom:10px">${esc(d.name)} <span class="mu">${info}</span>${bar(d.sharePct||0,'var(--gen)')}</div>`};
+ const idleText=idle.length?`<div class="mu" style="font-size:13px">Sem geração hoje (offline ou sem sol até agora): ${idle.map(d=>esc(d.name)).join(', ')}.</div>`:'';
+ const body=rows.length?rows.map(row).join('')+idleText
+  :all.length?`<div class="mu">Nenhum dispositivo deste grupo gerou energia hoje.</div>${idleText}`
+  :'<div class="mu">Nenhum dispositivo deste grupo coleta energia.</div>';
+ return `<div class="card" style="margin-bottom:16px"><h3>Participação na geração de hoje</h3>${body}</div>`};
 const batteryCard=x=>{
  const charging=x.status==='Carregando',filled=Math.round(x.pct/10);
  const cells=[...Array(10)].map((_,i)=>`<i style="${i<filled?`background:${charging?'var(--con)':col(x.pct)}`:''}"></i>`).join('');
