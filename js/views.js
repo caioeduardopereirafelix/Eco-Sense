@@ -27,7 +27,7 @@ const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}
    <div class="mu">Bateria ${num(d.battery)}% · Última comunicação ${esc(timeAgo(d.lastSeenAt))}</div>`;
 
 /* ---------- energia: fontes, baterias e consumidores ---------- */
-const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${bigKwh(x.energyKwh)}</div><div class="mu">Eficiência ${pct(x.efficiencyPct)} · ${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
+const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${bigKwh(x.energyKwh)}</div><div class="mu">${x.efficiencyPct!=null?`Eficiência ${pct(x.efficiencyPct)} · `:''}${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
 /* Participação de cada dispositivo na geração de hoje (s = resposta de api.getSources(group)).
    Mostra de onde vem o total: um sistema solar pode responder por quase tudo. */
 const shareCard=s=>{
@@ -106,11 +106,11 @@ async function renderForecast({detailed=false}={}){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
  /* ordem: menor autonomia primeiro, depois saldo negativo, sustentáveis e sem leitura */
- const rank=r=>r.f.daysLeft!=null?r.f.daysLeft:r.f.deficit?900:r.f.sustainable?1000:2000;
+ const rank=r=>r.f.sustainable?1000:r.f.daysLeft!=null?r.f.daysLeft:r.f.deficit?900:2000;
  const rows=devices.map(d=>({d,f:fById[d.id]})).sort((a,b)=>rank(a)-rank(b));
  const withReading=rows.filter(r=>hasForecast(r.f));
  const atRisk=rows.filter(r=>r.f.daysLeft!=null&&r.f.daysLeft<=7);
- const first=rows.find(r=>r.f.daysLeft!=null);
+ const first=rows.find(r=>r.f.daysLeft!=null&&!r.f.sustainable);
  const suns=rows.map(r=>r.f.sunHours).filter(h=>h!=null);
  const avgSun=suns.length?num(+(suns.reduce((a,b)=>a+b,0)/suns.length).toFixed(1)):'—';
  /* dispositivo e período escolhidos sobrevivem à atualização automática */
@@ -123,7 +123,7 @@ async function renderForecast({detailed=false}={}){
   <td>${daysTag(f)}</td><td>${f.confidence==null?'—':f.confidence+'%'}</td>
   ${detailed?`<td>${f.sunHours==null?'—':num(f.sunHours)+' h/dia'}</td>`:''}<td>${num(d.battery)}%</td>
   <td>${hasForecast(f)?`<button class="btn" data-pick="${esc(d.id)}" aria-label="Ver gráficos de ${esc(d.name)}">Ver<span class="pvx"> gráficos</span></button>`:''}</td></tr>`;
- const head=`<tr><th>Dispositivo</th>${detailed?'<th>Local</th>':''}<th>Autonomia</th><th><span class="pvx">Confiança</span><span class="pvm">Conf.</span></th>${detailed?'<th>Exposição solar</th>':''}<th>Bateria</th><th></th></tr>`;
+ const head=`<tr><th>Dispositivo</th>${detailed?'<th>Local</th>':''}<th>Autonomia</th><th><span class="pvx">Confiança</span><span class="pvm">Conf.</span></th>${detailed?'<th title="Horas por dia com geração de energia (cadastradas ou medidas nos últimos 7 dias)">Exposição solar</th>':''}<th>Bateria</th><th></th></tr>`;
  V.innerHTML=`<div class="grid">
   <div class="card"><h3>Em risco (até 7 dias)</h3><div class="big">${atRisk.length}</div><div class="mu">de ${withReading.length} dispositivos com leitura</div></div>
   <div class="card"><h3>Menor autonomia</h3><div class="big">${first?first.f.daysLeft:'—'} <small>${first?(first.f.daysLeft===1?'dia':'dias'):''}</small></div><div class="mu">${first?esc(first.d.name):'Nenhum dispositivo em esgotamento'}</div></div>
@@ -140,10 +140,10 @@ async function renderForecast({detailed=false}={}){
    <div><h3 class="mu" style="margin-bottom:8px">Nível de bateria projetado (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
    <div class="mu" style="margin-top:10px">A linha tracejada vertical marca o momento atual. Antes dela, dados medidos; depois, previsão.</div></div>`;
  const info=({f})=>{
-  const parts=[`Autonomia: ${daysTag(f)}`];
+  const parts=[`Autonomia: ${daysTag(f)}${f.sustainable&&f.daysLeft!=null?` (a bateria cai só por autodescarga: ~${f.daysLeft} dias)`:''}`];
   if(f.confidence!=null)parts.push(`confiança ${f.confidence}%${f.confidence<60?' (baixa: bateria oscila muito ou contradiz o saldo)':''}`);
   if(f.balanceWhDay!=null)parts.push(`saldo coleta − consumo: ${balanceText(f.balanceWhDay)} (7 dias)`);
-  if(detailed)parts.push(f.sunHours==null?'sem geração solar':`exposição solar ${num(f.sunHours)} h/dia`,`estação: ${esc(fc.season)}`);
+  if(detailed)parts.push(f.sunHours==null?'exposição solar não medida':`exposição solar ${num(f.sunHours)} h/dia`,`estação: ${esc(fc.season)}`);
   return parts.join(' · ')};
  const drawRange=()=>{const r=$('#prange');r.innerHTML='';const f=filters([['24h','Próximas 24 h'],['7d','Próximos 7 dias']],st.range,k=>{st.range=k;drawRange();drawCharts()});f.style.margin='0';r.append(f)};
  const drawCharts=async()=>{

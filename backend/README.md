@@ -16,17 +16,20 @@ Pré-requisitos: **JDK 21+** e **MySQL 8** rodando. O Maven vem junto (`mvnw`).
 1. Copie [`.env.example`](.env.example) para `backend/.env` e preencha (o `.env` não vai para o git):
 
    ```properties
-   THINGSPEAK_READ_API_KEY=          # só para canais privados; vazio = só canais públicos
+   THINGSPEAK_READ_API_KEY=
    MYSQL_URL=jdbc:mysql://localhost:3306/ecosense?createDatabaseIfNotExist=true&serverTimezone=UTC
    MYSQL_USER=root
    MYSQL_PASSWORD=sua_senha
    ```
 
+   `THINGSPEAK_READ_API_KEY` só é necessária para canais privados (vazia = só canais públicos). Não escreva
+   comentários na mesma linha de um valor: no `.env`, tudo depois do `=` faz parte do valor, inclusive um `#`.
+
 2. Suba o back-end:
 
    ```bash
    cd backend
-   ./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
+   sh mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
    ```
 
    No IntelliJ: rode a classe `EcoSenseApplication` (sem argumentos). O *Working directory* deve ser a
@@ -145,7 +148,7 @@ Depois de ~1 min (cache), o dispositivo cadastrado com esse canal aparece Online
 ## Testes
 
 ```bash
-./mvnw test
+sh mvnw test
 ```
 
 Os testes **não** usam internet nem MySQL: o perfil `test`

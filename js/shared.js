@@ -31,11 +31,13 @@ function energyScale(...seriesWh){
 /* rótulo do eixo X a partir de um timestamp: passo 'hour' → "14h"; 'day' → "05/11" */
 const timeLabel=(iso,step)=>{const d=new Date(iso);
  return step==='hour'?`${d.getHours()}h`:`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`};
-/* Tag de autonomia: dias restantes (crítico ≤3, atenção ≤7), "Sustentável", "Saldo negativo"
-   (bateria ainda estável, mas consome mais do que coleta) ou "Sem leitura" */
-const daysTag=f=>f.daysLeft!=null
+/* Tag de autonomia: "Sustentável" (coleta cobre o consumo; pode vir com dias, quando a bateria cai só
+   por autodescarga), dias restantes (crítico ≤3, atenção ≤7), "Saldo negativo" (bateria ainda estável,
+   mas consome mais do que coleta) ou "Sem leitura" */
+const daysTag=f=>f.sustainable
+ ?`<span class="tag s-Normal"${f.daysLeft!=null?` title="Coleta maior que o consumo; a bateria cai devagar (autonomia de ${f.daysLeft} dias)"`:''}>Sustentável</span>`
+ :f.daysLeft!=null
  ?`<span class="tag s-${f.daysLeft<=3?'Crítico':f.daysLeft<=7?'Atenção':'Normal'}">${f.daysLeft} ${f.daysLeft===1?'dia':'dias'}</span>`
- :f.sustainable?'<span class="tag s-Normal">Sustentável</span>'
  :f.deficit?'<span class="tag s-Atenção" title="A bateria não está caindo, mas o consumo supera a coleta">Saldo negativo</span>'
  :'<span class="tag s-Baixa">Sem leitura</span>';
 /* tem previsão (dias, sustentável ou saldo negativo) */

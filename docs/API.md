@@ -160,6 +160,11 @@ No ThingSpeak, cada dispositivo costuma ser um canal; `lastSeenAt` = `created_at
 }
 ```
 A previsão usa os últimos 7 dias. `daysLeft` = dias até a bateria esgotar (bateria caindo), ou `null`.
+
+`sustainable: true` também vale com bateria caindo **devagar** (`daysLeft` acima de 30) quando a coleta é
+maior que o consumo (`balanceWhDay > 0`): a queda é autodescarga/perdas, não falta de energia. Nesse caso
+`daysLeft` continua preenchido e o front mostra "Sustentável".
+
 Com `daysLeft: null`:
 - `sustainable: true`: bateria estável/subindo **e** saldo energético não negativo (ou não medido);
 - `deficit: true`: bateria estável/subindo, mas o consumo supera a coleta (front mostra "Saldo negativo");
@@ -167,7 +172,9 @@ Com `daysLeft: null`:
 
 `balanceWhDay` = coleta − consumo médio em Wh/dia (`null` se o canal não mede as duas grandezas).
 `confidence` em % (ou `null`); cai com oscilação da bateria, poucos dados e quando bateria e saldo se
-contradizem. `sunHours` = horas de sol por dia no local (`null` se o dispositivo não usa solar).
+contradizem. `sunHours` = horas de sol por dia: a cadastrada no dispositivo ou, sem ela, as horas com
+geração medidas nos últimos 7 dias (horas em que a coleta passou de 1% do pico da semana); `null` se o
+canal não mede coleta ou há menos de um dia de leituras.
 
 ### `GET /api/devices/{id}/forecast?range=24h|7d` → `api.getForecastSeries(id, range)`
 ```json

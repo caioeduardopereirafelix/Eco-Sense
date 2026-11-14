@@ -6,20 +6,16 @@
 
 /* ---------- preferências de notificação (salvas neste navegador; nome e e-mail vêm do login) ---------- */
 const PREF_KEY='eh-user-prefs';
-const DEFAULT_PREFS={limit:300,critical:true,high:true,mail:false};
+const DEFAULT_PREFS={critical:true,high:true};
 function loadPrefs(){try{return{...DEFAULT_PREFS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')}}catch(e){return{...DEFAULT_PREFS}}}
 function savePrefs(p){try{localStorage.setItem(PREF_KEY,JSON.stringify(p));return true}catch(e){return false}}
 let prefs=loadPrefs();
 
-/* ---------- alertas do usuário: respeitam as notificações e o limite de consumo ---------- */
+/* ---------- alertas do usuário: respeitam as preferências de notificação ---------- */
 let alertsBase=null;
 async function userAlerts(){
  if(!alertsBase)alertsBase=await api.getAlerts();
- const o=await api.getOverview();
- const list=alertsBase.filter(a=>a.level==='critical'?prefs.critical:a.level==='high'?prefs.high:true);
- const nowW=o.consumption.nowW;
- if(prefs.high&&nowW>prefs.limit)list.unshift({id:'limit',level:'high',title:'Consumo acima do seu limite',message:`Consumo atual de ${power(nowW)}, acima do limite de ${num(prefs.limit)} W.`,createdAt:new Date().toISOString()});
- return withRead(list);
+ return withRead(alertsBase.filter(a=>a.level==='critical'?prefs.critical:a.level==='high'?prefs.high:true));
 }
 function bindAlerts(redraw){
  V.onclick=async e=>{const b=e.target.closest('[data-read],[data-readall]');if(!b)return;
@@ -133,14 +129,11 @@ async conta(){
   <div class="card" style="max-width:640px">
   <h3>Notificações</h3>
   <div class="mu" style="font-size:13px">Preferências salvas neste navegador.</div>
-  ${sw('critical','Bateria crítica','Avisar quando um dispositivo estiver com bateria muito baixa')}
-  ${sw('high','Consumo elevado','Avisar quando o consumo passar do seu limite')}
-  ${sw('mail','Receber alertas por e-mail',`Enviar um resumo para ${esc(me.email)}`)}
-  <div class="set"><div><b>Limite de consumo</b><div class="mu">Alerta acima de <span id="limv">${p.limit}</span> W</div></div><input id="limr" type="range" min="100" max="600" step="10" value="${p.limit}" aria-label="Limite de consumo em watts"></div>
+  ${sw('critical','Bateria crítica','Avisar quando um dispositivo estiver com bateria muito baixa ou prestes a esgotar')}
+  ${sw('high','Consumo elevado e dispositivos offline','Avisar quando um dispositivo consumir bem acima da própria média ou parar de transmitir')}
   <div class="row" style="margin:12px 0 0"><button class="btn on" id="csave">Salvar notificações</button><span class="mu" id="cok" role="status"></span></div></div>`;
  bindAccount();
  V.onclick=e=>{const b=e.target.closest('[data-pref]');if(!b)return;const k=b.dataset.pref;p[k]=!p[k];b.classList.toggle('on',p[k]);b.setAttribute('aria-checked',String(p[k]));$('#cok').textContent=''};
- $('#limr').oninput=e=>{p.limit=+e.target.value;$('#limv').textContent=p.limit;$('#cok').textContent=''};
  $('#csave').onclick=()=>{prefs=p;
   $('#cok').textContent=savePrefs(p)?'Notificações salvas.':'Aplicadas nesta sessão (não foi possível salvar no navegador).'}}
 };
