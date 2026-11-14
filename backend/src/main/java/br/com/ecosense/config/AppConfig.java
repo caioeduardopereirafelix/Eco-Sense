@@ -16,13 +16,11 @@ public class AppConfig implements WebMvcConfigurer {
         this.props = props;
     }
 
-    /** Relógio injetável: permite testar regras que dependem de "agora". */
     @Bean
     public Clock clock() {
         return Clock.systemUTC();
     }
 
-    /** Libera o front-end (servido em outra porta/origem) para chamar a API. */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         if (props.corsOrigins().isEmpty()) return;

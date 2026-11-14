@@ -22,12 +22,6 @@ import br.com.ecosense.config.EcoSenseProperties.Fields;
 import br.com.ecosense.persistence.DeviceEntity;
 import br.com.ecosense.persistence.DeviceRepository;
 
-/**
- * Cadastro de dispositivos guardado no banco (tabela devices).
- * - Na primeira vez (tabela vazia), copia os dispositivos iniciais do application*.yml.
- * - Mantém uma cópia em memória para não consultar o banco a cada requisição; ela é recarregada
- *   a cada criação, edição ou remoção.
- */
 @Service
 public class DeviceCatalog {
 
@@ -46,8 +40,6 @@ public class DeviceCatalog {
         this.clock = clock;
     }
 
-    /* ---------------- leitura ---------------- */
-
     public List<DeviceConfig> all() {
         List<DeviceConfig> current = cache;
         return current != null ? current : reload();
@@ -60,8 +52,6 @@ public class DeviceCatalog {
     public DeviceSettings settings(String id) {
         return toSettings(entity(id));
     }
-
-    /* ---------------- escrita ---------------- */
 
     @Transactional
     public synchronized DeviceConfig create(DeviceSettings s) {
@@ -87,7 +77,7 @@ public class DeviceCatalog {
         requireChannel(s);
         apply(s, e);
         repository.save(e);
-        readings.evict(id); // canal ou conversão podem ter mudado
+        readings.evict(id);
         reload();
         return find(id).orElseThrow();
     }
@@ -98,8 +88,6 @@ public class DeviceCatalog {
         readings.evict(id);
         reload();
     }
-
-    /* ---------------- carga e conversão ---------------- */
 
     private synchronized List<DeviceConfig> reload() {
         if (repository.count() == 0 && !props.devices().isEmpty()) seed();
@@ -134,7 +122,6 @@ public class DeviceCatalog {
             throw ApiException.badRequest("A tensão de bateria cheia deve ser maior que a de bateria vazia.");
     }
 
-    /** Copia os campos editáveis do formulário para a entidade. */
     private void apply(DeviceSettings s, DeviceEntity e) {
         e.setName(s.name().trim());
         e.setLocation(blankToNull(s.location()));

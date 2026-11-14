@@ -31,7 +31,6 @@ import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
 import br.com.ecosense.service.ReadingService.DeviceData;
 
-/** Visão geral, fontes de energia, cargas, baterias e alertas, derivados das leituras. */
 @Service
 public class EnergyService {
 
@@ -52,9 +51,6 @@ public class EnergyService {
         this.clock = clock;
     }
 
-    /* ---------------- visão geral ---------------- */
-
-    /** Totais de uma categoria de dispositivos (ALL = todos). */
     public Overview overview(DeviceGroup group) {
         List<DeviceConfig> all = devices.configs(group);
         Period p = period();
@@ -81,10 +77,6 @@ public class EnergyService {
                 new DeviceCount(all.size(), online, all.size() - online));
     }
 
-    /**
-     * Com baterias do sistema configuradas: carga ponderada pela capacidade. Sem elas: média dos dispositivos.
-     * As baterias do sistema são bancos de instalações de energia, então não entram no grupo IoT.
-     */
     private Storage storage(List<Double> deviceBatteries, DeviceGroup group) {
         double stored = 0, capacity = 0;
         for (StorageConfig s : group == DeviceGroup.IOT ? List.<StorageConfig>of() : props.storage()) {
@@ -102,12 +94,6 @@ public class EnergyService {
         return new Storage(pct, null, null, pct == null ? "Atenção" : statusFor(pct));
     }
 
-    /* ---------------- fontes, cargas e baterias ---------------- */
-
-    /**
-     * Uma fonte por tipo de coleta (Solar, Térmico…), somando os dispositivos daquele tipo na categoria
-     * pedida, com a participação de cada dispositivo.
-     */
     public List<Source> sources(DeviceGroup group) {
         Period p = period();
         Map<String, List<DeviceConfig>> byType = new LinkedHashMap<>();
@@ -130,13 +116,11 @@ public class EnergyService {
             Instant updatedAt = configs.stream().map(d -> readings.data(d).latest()).filter(Objects::nonNull)
                     .map(Reading::at).max(Comparator.naturalOrder())
                     .map(t -> t.truncatedTo(ChronoUnit.SECONDS)).orElse(null);
-            /* eficiência exige saber a energia disponível no ambiente; null até existir esse dado */
             result.add(new Source(type, Stats.sig(kwh), null, anyOnline ? "Normal" : "Atenção", updatedAt, shares));
         });
         return result;
     }
 
-    /** Cada dispositivo como carga: consumo atual × média de 7 dias. */
     public List<Load> loads() {
         Instant weekAgo = clock.instant().minus(Duration.ofDays(7));
         return devices.configs().stream().map(d -> {
@@ -144,7 +128,6 @@ public class EnergyService {
             boolean online = devices.isOnline(d, data);
             double current = online && data.latest().consumptionW() != null ? data.latest().consumptionW() : 0;
             Double avg = Stats.mean(DeviceService.since(data.hourly(), weekAgo), Reading::consumptionW);
-            /* canal que não mede consumo: currentW/avgW null em vez de 0 */
             boolean measured = d.fields().measuresConsumption();
             return new Load(d.name(), d.type(), measured ? Stats.sig(current) : null,
                     !measured ? null : avg == null ? 0d : Stats.sig(avg),
@@ -161,9 +144,6 @@ public class EnergyService {
         }).toList();
     }
 
-    /* ---------------- alertas ---------------- */
-
-    /** Alertas derivados do estado atual. Sem problemas, devolve um alerta "Sistema normal". */
     public List<Alert> alerts() {
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         List<Alert> alerts = new ArrayList<>();
@@ -212,8 +192,6 @@ public class EnergyService {
         return alerts;
     }
 
-    /* ---------------- auxiliares ---------------- */
-
     private record Period(Instant now, Instant todayStart, Instant yesterdayStart, Instant sameTimeYesterday) {}
 
     private Period period() {
@@ -247,7 +225,6 @@ public class EnergyService {
         };
     }
 
-    /** Potência com a unidade adequada: "1,2 W", "0,45 mW", "80 µW". */
     static String fmt(double w) {
         java.util.Locale br = java.util.Locale.of("pt", "BR");
         double abs = Math.abs(w);
@@ -256,7 +233,6 @@ public class EnergyService {
         return String.format(br, "%.0f µW", w * 1_000_000);
     }
 
-    /** Energia com unidade adaptativa: 1830 → "1,83 kWh"; 0,319 → "319 mWh". */
     static String fmtWh(double wh) {
         java.util.Locale br = java.util.Locale.of("pt", "BR");
         double abs = Math.abs(wh);

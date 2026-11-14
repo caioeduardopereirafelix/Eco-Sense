@@ -1,13 +1,10 @@
-# segredos (chaves do ThingSpeak etc.) — nunca versionar
 .env
 .env.*
 !.env.example
 
-# IDEs e sistema
 .idea/
 *.iml
 .DS_Store
 Thumbs.db
 
-# ferramentas locais do Claude Code
 .claude/

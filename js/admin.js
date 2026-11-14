@@ -1,5 +1,3 @@
-/* ===== PAINEL ADMIN (futura rota /admin) ===== */
-/* ===== 4. TELAS ===== */
 const pages={
 async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(group),api.getAlerts(),api.getHistory('hoje',{group})]);
  V.innerHTML=`<div class="grid">
@@ -41,7 +39,6 @@ async manutencao(){
   if(d.battery<45||(f&&f.daysLeft!=null&&f.daysLeft<=7))return{label:'Atenção',color:css('--wn'),className:'medium'};
   return{label:'Baixo',color:css('--ok'),className:'low'}
  };
- /* filtro e enquadramento do mapa sobrevivem à atualização automática */
  const st=pageState({scope:'abertas',mapView:null});
  let notice='',map=null;
  const regionOf=r=>deviceById[r.deviceId]?.region||'Sem região definida';
@@ -103,14 +100,10 @@ async manutencao(){
   else{
    const dark=document.documentElement.dataset.theme==='dark';
    map=window.L.map('maintenance-map',{minZoom:1,maxZoom:18,zoomControl:true,worldCopyJump:false,maxBoundsViscosity:1});
-   /* Tiles do OpenStreetMap (a CARTO passou a exigir chave de API). A OSM exige Referer, então abra o
-      front por um servidor local (Live Server etc.), não como arquivo. No tema escuro, um filtro CSS
-      (.map-dark em style.css) escurece os tiles. */
    $('#maintenance-map').classList.toggle('map-dark',dark);
    const tileLayer=window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}).addTo(map);
    let tileErrors=0;
    tileLayer.on('tileerror',()=>{if(++tileErrors===3)mapNote.textContent='Não foi possível carregar o mapa base. Verifique a conexão com o serviço de mapas; os pontos continuam visíveis.'});
-   /* mantém o tamanho do mapa em dia: sem isso, ao arrastar aparecem faixas em branco */
    const sizeMap=map;let ro=null;
    if(window.ResizeObserver){ro=new ResizeObserver(()=>{if(sizeMap===map)sizeMap.invalidateSize({animate:false})});ro.observe($('#maintenance-map'))}
    setTimeout(()=>{if(sizeMap===map)sizeMap.invalidateSize({animate:false})},0);
@@ -123,7 +116,6 @@ async manutencao(){
    });
    if(markers.length){const b=window.L.featureGroup(markers).getBounds();map.fitBounds(b.pad(.2));map.setMaxBounds(b.pad(4))}
    else map.setView([-15.79,-47.88],11);
-   /* mantém o zoom/posição que o usuário escolheu quando a tela é redesenhada */
    if(st.mapView)map.setView(st.mapView.center,st.mapView.zoom,{animate:false});
    map.on('moveend',()=>{if(sizeMap===map)st.mapView={center:map.getCenter(),zoom:map.getZoom()}});
    if(points.length<devices.length)mapNote.textContent=`${devices.length-points.length} dispositivo(s) sem coordenadas não aparecem no mapa.`
@@ -144,11 +136,8 @@ async manutencao(){
 async dispositivos(notice=''){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
- /* o filtro sobrevive à atualização automática (com o formulário aberto ela fica pausada) */
  const st=pageState({filter:'all'});
- let current=st.filter,form=null; /* form: null | {mode:'new'|'edit', s: configuração, channel: dados do canal} */
- /* saldo = energia coletada - consumo (Wh). Sem harvesting, o saldo é só o consumo negativo. */
- /* null quando falta consumo ou coleta medidos (não dá para calcular o saldo) */
+ let current=st.filter,form=null;
  const balance=d=>d.consumption==null||(d.harvesting&&d.harvesting.collected==null)?null:(d.harvesting?d.harvesting.collected:0)-d.consumption;
  const isOn=d=>d.status==='Online';
  const filtersFn={
@@ -189,7 +178,6 @@ async dispositivos(notice=''){
   if(form)$('#devform').scrollIntoView({block:'start'});
  };
 
- /* ---------- cadastro: formulário de novo dispositivo / edição ---------- */
  const FIELD_KEYS=[['battery','Bateria'],['consumption','Consumo'],['temperature','Temperatura'],['harvested','Energia coletada']];
  const fieldOptions=(sel,channel)=>['none',...[1,2,3,4,5,6,7,8].map(i=>'field'+i)].map(f=>{
   const label=f==='none'?'— não mede':(channel&&channel.fields[f]?`${f} · ${channel.fields[f]}`:f);
@@ -236,7 +224,6 @@ async dispositivos(notice=''){
    <div role="alert" style="color:var(--cr);min-height:20px;margin-top:12px;font-size:13px">${esc(error||'')}</div>
    <div class="row" style="margin:8px 0 0"><button class="btn on" type="submit">Salvar</button><button class="btn" type="button" data-cancel="1">Cancelar</button></div>
   </form>`};
- /* lê o formulário; números aceitam vírgula; vazio = null */
  const readForm=()=>{
   const el=$('#devform'),v=n=>el.elements[n].value.trim();
   const n=x=>{const t=v(x).replace(',','.');if(t==='')return null;const r=Number(t);if(!Number.isFinite(r))throw new Error(`Valor inválido em "${el.elements[x].closest('label').firstChild.textContent.trim()}".`);return r};
@@ -270,7 +257,6 @@ async dispositivos(notice=''){
    try{
     const ch=await api.getChannelInfo(form.s.channelId);
     form.channel=ch;form.error='';
-    /* preenche o que estiver vazio com os dados do canal */
     if(!form.s.name)form.s.name=ch.name;
     if(form.s.latitude==null&&ch.latitude!=null){form.s.latitude=ch.latitude;form.s.longitude=ch.longitude}
    }catch(err){form.error=err.message}
@@ -278,7 +264,6 @@ async dispositivos(notice=''){
   }
  };
  const submit=V.onsubmit=async e=>{
-  /* getAttribute: o form tem um campo "id", e form.id devolveria esse campo, não o atributo */
   if(e.target.getAttribute('id')!=='devform')return;
   e.preventDefault();
   const btn=e.target.querySelector('[type=submit]');
@@ -289,7 +274,6 @@ async dispositivos(notice=''){
    await pages.dispositivos(`Dispositivo ${form.s.name} salvo.`);
   }catch(err){form.error=err.message;draw(current)}
  };
- /* só remove o próprio handler: na atualização automática, a versão nova já registrou o dela */
  onLeave(()=>{if(V.onsubmit===submit)V.onsubmit=null});
  draw(current)},
 previsao:()=>renderForecast({detailed:true}),
@@ -301,7 +285,7 @@ async alertas(){const a=await api.getAlerts();
 async usuarios(notice=''){
  const users=await api.getUsers();
  const meId=auth.get().user.id;
- let form=null; /* null | {mode:'new'|'edit'|'reset', u: usuário, error} */
+ let form=null;
  const roleTag=r=>`<span class="tag s-${r==='ADMIN'?'Alta':'Normal'}">${auth.roleLabel(r)}</span>`;
  const day=iso=>iso?new Date(iso).toLocaleDateString('pt-BR'):'—';
  const roleSelect=(role,disabled)=>`<select name="role"${disabled?' disabled':''}>${[['USER','Usuário'],['ADMIN','Administrador']].map(([v,l])=>`<option value="${v}"${v===role?' selected':''}>${l}</option>`).join('')}</select>`;

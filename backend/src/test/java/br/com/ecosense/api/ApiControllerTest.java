@@ -21,14 +21,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-/** API completa com o cliente simulado do ThingSpeak (application.yml padrão). */
 @SpringBootTest
 @ActiveProfiles("test")
 class ApiControllerTest {
 
     @Autowired
     WebApplicationContext ctx;
-    /* todas as requisições vão com o token do administrador */
     MockMvc mvc;
 
     @BeforeEach
@@ -67,14 +65,13 @@ class ApiControllerTest {
         mvc.perform(get("/api/forecasts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.season").value(notNullValue()))
-                .andExpect(jsonPath("$.items[0].sustainable").value(true))      // IOT-001 carregando
+                .andExpect(jsonPath("$.items[0].sustainable").value(true))
                 .andExpect(jsonPath("$.items[0].deficit").value(false))
                 .andExpect(jsonPath("$.items[0].balanceWhDay").value(org.hamcrest.Matchers.greaterThan(0.0)))
-                .andExpect(jsonPath("$.items[2].daysLeft").value(lessThanOrEqualTo(4))) // IOT-003 caindo 4%/dia
-                .andExpect(jsonPath("$.items[6].daysLeft").value(org.hamcrest.Matchers.nullValue())) // offline
+                .andExpect(jsonPath("$.items[2].daysLeft").value(lessThanOrEqualTo(4)))
+                .andExpect(jsonPath("$.items[6].daysLeft").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.items[6].sustainable").value(false))
                 .andExpect(jsonPath("$.items[6].deficit").value(false))
-                /* IOT-010: bateria subindo, mas coleta < consumo → não é sustentável */
                 .andExpect(jsonPath("$.items[9].daysLeft").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.items[9].sustainable").value(false))
                 .andExpect(jsonPath("$.items[9].deficit").value(true))
@@ -112,7 +109,6 @@ class ApiControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.step").value("day"))
                 .andExpect(jsonPath("$.timestamps", hasSize(7)))
-                /* [5] = ontem (sempre completo); hoje ([6]) pode não ter leitura logo após a meia-noite */
                 .andExpect(jsonPath("$.generatedKwh[5]").isNumber())
                 .andExpect(jsonPath("$.storagePct[0]").isNumber());
         mvc.perform(get("/api/history").param("range", "hoje"))
@@ -133,13 +129,11 @@ class ApiControllerTest {
                 .andExpect(jsonPath("$[0].level").value("critical"));
     }
 
-    /* IOT-006 é o único "Sistema solar" (application-test.yml); os outros 9 contam como IoT */
     @Test
     void visaoGeralPorGrupo() throws Exception {
         mvc.perform(get("/api/overview").param("group", "iot"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.devices.total").value(9))
-                /* baterias do sistema são de instalações de energia: no grupo IoT vale a média dos dispositivos */
                 .andExpect(jsonPath("$.storage.capacityKwh").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.storage.pct").isNumber());
         mvc.perform(get("/api/overview").param("group", "sistemas"))
@@ -153,11 +147,9 @@ class ApiControllerTest {
 
     @Test
     void historicoPorGrupoSomaOTotal() throws Exception {
-        /* [5] = ontem, sempre completo */
         double all = yesterdayGenerated(""), iot = yesterdayGenerated("iot"), systems = yesterdayGenerated("sistemas");
         org.assertj.core.api.Assertions.assertThat(iot + systems)
                 .isCloseTo(all, org.assertj.core.api.Assertions.within(all * 0.01));
-        /* o sistema solar gera ~1000× mais: somado, esconde os sensores */
         org.assertj.core.api.Assertions.assertThat(systems).isGreaterThan(iot * 100);
     }
 
@@ -172,7 +164,6 @@ class ApiControllerTest {
     void fontesTrazemParticipacaoDeCadaDispositivo() throws Exception {
         mvc.perform(get("/api/sources"))
                 .andExpect(status().isOk())
-                /* Solar: IOT-001, 002, 003, 004, 006 e 007 */
                 .andExpect(jsonPath("$[0].devices", hasSize(6)))
                 .andExpect(jsonPath("$[0].devices[?(@.id == 'IOT-006')].group").value(org.hamcrest.Matchers.contains("sistemas")))
                 .andExpect(jsonPath("$[0].devices[?(@.id == 'IOT-001')].group").value(org.hamcrest.Matchers.contains("iot")));

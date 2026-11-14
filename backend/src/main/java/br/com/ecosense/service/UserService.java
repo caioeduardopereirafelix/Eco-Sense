@@ -30,10 +30,6 @@ import br.com.ecosense.security.AuthUser;
 import br.com.ecosense.security.TokenService;
 import br.com.ecosense.security.TokenService.IssuedToken;
 
-/**
- * Login, conta do usuário e gestão de usuários (admin).
- * Na primeira inicialização (tabela vazia) cria o administrador definido em ecosense.auth.
- */
 @Service
 public class UserService implements ApplicationRunner {
 
@@ -45,7 +41,6 @@ public class UserService implements ApplicationRunner {
     private final TokenService tokens;
     private final AuthProperties props;
     private final Clock clock;
-    /* hash de uma senha qualquer: o login de e-mail inexistente leva o mesmo tempo que o de senha errada */
     private final String dummyHash;
 
     public UserService(UserRepository users, PasswordEncoder encoder, TokenService tokens,
@@ -57,8 +52,6 @@ public class UserService implements ApplicationRunner {
         this.clock = clock;
         this.dummyHash = encoder.encode("ecosense-dummy-password");
     }
-
-    /* ---------------- primeiro administrador ---------------- */
 
     @Override
     @Transactional
@@ -86,8 +79,6 @@ public class UserService implements ApplicationRunner {
         }
     }
 
-    /* ---------------- login e conta ---------------- */
-
     @Transactional(readOnly = true)
     public Session login(String email, String password) {
         UserEntity user = users.findByEmailIgnoreCase(email.trim()).orElse(null);
@@ -113,7 +104,6 @@ public class UserService implements ApplicationRunner {
         return toInfo(users.save(user));
     }
 
-    /** Troca a própria senha. Encerra as outras sessões e devolve um token novo para esta. */
     @Transactional
     public Session changePassword(AuthUser current, PasswordChange body) {
         UserEntity user = entity(current.id());
@@ -123,8 +113,6 @@ public class UserService implements ApplicationRunner {
         setPassword(user, body.newPassword());
         return session(users.save(user));
     }
-
-    /* ---------------- gestão de usuários (admin) ---------------- */
 
     @Transactional(readOnly = true)
     public List<UserInfo> list() {
@@ -138,7 +126,6 @@ public class UserService implements ApplicationRunner {
         return toInfo(users.save(newEntity(body.name().trim(), email, body.role(), body.password())));
     }
 
-    /** Não é permitido mudar o próprio perfil: assim sempre resta pelo menos um administrador. */
     @Transactional
     public UserInfo update(AuthUser current, long id, UserUpdate body) {
         UserEntity user = entity(id);
@@ -153,7 +140,6 @@ public class UserService implements ApplicationRunner {
         return toInfo(users.save(user));
     }
 
-    /** Define uma nova senha para o usuário (ex.: esqueceu a senha) e encerra as sessões dele. */
     @Transactional
     public void resetPassword(long id, String password) {
         UserEntity user = entity(id);
@@ -166,8 +152,6 @@ public class UserService implements ApplicationRunner {
         if (id == current.id()) throw ApiException.badRequest("Você não pode remover o seu próprio usuário.");
         users.delete(entity(id));
     }
-
-    /* ---------------- auxiliares ---------------- */
 
     private Session session(UserEntity user) {
         IssuedToken token = tokens.issue(user);
@@ -187,7 +171,7 @@ public class UserService implements ApplicationRunner {
 
     private void setPassword(UserEntity user, String password) {
         user.setPasswordHash(encoder.encode(password));
-        user.setTokenVersion(user.getTokenVersion() + 1); // tokens antigos deixam de valer
+        user.setTokenVersion(user.getTokenVersion() + 1);
     }
 
     private UserEntity entity(long id) {

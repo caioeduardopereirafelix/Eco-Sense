@@ -7,12 +7,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-/** Funções numéricas usadas pelos serviços. */
 final class Stats {
 
     private Stats() {}
 
-    /** Média ignorando nulls; null se não houver valores. */
     static Double mean(Collection<Double> values) {
         double sum = 0;
         int n = 0;
@@ -37,10 +35,6 @@ final class Stats {
         return value == null ? null : round(value.doubleValue(), decimals);
     }
 
-    /**
-     * Arredonda para 4 algarismos significativos. Usado em potência e energia, que variam de
-     * microwatts (energy harvesting) a quilowatts: 0,000112 continua 0,000112, e 312,456 vira 312,5.
-     */
     static double sig(double value) {
         if (value == 0 || !Double.isFinite(value)) return value == 0 ? 0 : value;
         return new java.math.BigDecimal(value).round(new java.math.MathContext(4)).doubleValue();
@@ -50,16 +44,8 @@ final class Stats {
         return Math.max(min, Math.min(max, v));
     }
 
-    /**
-     * Tendência linear (mínimos quadrados) de um valor ao longo do tempo.
-     *
-     * @param slopePerDay  variação por dia
-     * @param residualStd  desvio padrão dos resíduos (o quanto os pontos fogem da reta)
-     * @param points       quantidade de pontos usados
-     */
     record Trend(double slopePerDay, double residualStd, int points) {}
 
-    /** Calcula a tendência; null se houver menos de {@code minPoints} valores. */
     static Trend trend(List<Reading> readings, Instant reference, Function<Reading, Double> value, int minPoints) {
         List<double[]> pts = readings.stream()
                 .filter(r -> value.apply(r) != null)

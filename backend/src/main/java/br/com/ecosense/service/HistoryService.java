@@ -16,11 +16,6 @@ import br.com.ecosense.api.ApiException;
 import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 
-/**
- * Histórico agregado dos dispositivos (todos ou de uma categoria).
- * Cada leitura horária do ThingSpeak é a média de potência (W) naquela hora, então a energia da
- * hora é W × 1 h; somando as horas de um período obtém-se a energia do período (kWh = Wh / 1000).
- */
 @Service
 public class HistoryService {
 
@@ -36,10 +31,6 @@ public class HistoryService {
         this.clock = clock;
     }
 
-    /**
-     * range: hoje | 7d | 30d | custom (custom exige from e to, até {@value ReadingService#HISTORY_DAYS} dias).
-     * group: categoria de dispositivos somada (ALL = todos).
-     */
     public History history(String range, LocalDate from, LocalDate to, DeviceGroup group) {
         Instant now = clock.instant();
         LocalDate today = LocalDate.ofInstant(now, props.zone());
@@ -86,7 +77,6 @@ public class HistoryService {
         return new History(hourly ? "hour" : "day", timestamps, generated, consumed, storage);
     }
 
-    /** Energia (kWh) de um conjunto de dispositivos entre dois instantes, a partir das médias horárias. */
     public double energyKwh(List<DeviceConfig> configs, Instant from, Instant to, Function<Reading, Double> powerW) {
         return sumKwh(configs.stream().map(d -> between(readings.data(d).hourly(), from, to)).toList(), powerW);
     }
@@ -96,7 +86,7 @@ public class HistoryService {
         for (List<Reading> rs : perDevice) {
             for (Reading r : rs) {
                 Double w = powerW.apply(r);
-                if (w != null) wh += w; // média da hora (W) × 1 h
+                if (w != null) wh += w;
             }
         }
         return wh / 1000;

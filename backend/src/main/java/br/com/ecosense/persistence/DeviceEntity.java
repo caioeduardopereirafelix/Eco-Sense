@@ -7,11 +7,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/**
- * Cadastro de um dispositivo (tabela {@code devices}): dados descritivos + qual canal do ThingSpeak
- * ler e como converter as leituras. As LEITURAS não ficam aqui; vêm do ThingSpeak em tempo real.
- * A Read API Key não é guardada no banco: vem de THINGSPEAK_READ_API_KEY.
- */
 @Entity
 @Table(name = "devices")
 public class DeviceEntity {
@@ -37,7 +32,6 @@ public class DeviceEntity {
     private String harvestingType;
     private Double sunHours;
 
-    /* canal do ThingSpeak */
     private Long channelId;
     private Integer historyChunkDays;
     @Column(length = 8)
@@ -49,7 +43,6 @@ public class DeviceEntity {
     @Column(length = 8)
     private String fieldHarvested;
 
-    /* conversões de unidade */
     private Double batteryVoltageMin;
     private Double batteryVoltageMax;
     private Double consumptionScale;
@@ -57,7 +50,6 @@ public class DeviceEntity {
     private Double temperatureScale;
 
 
-    /** ordem de exibição */
     private Integer position;
     private Instant createdAt;
     private Instant updatedAt;

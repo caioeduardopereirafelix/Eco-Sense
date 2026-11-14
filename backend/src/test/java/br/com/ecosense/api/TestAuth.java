@@ -11,11 +11,10 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.jayway.jsonpath.JsonPath;
 
-/** Ajuda dos testes: faz login de verdade e devolve um MockMvc que envia o token em toda requisição. */
 final class TestAuth {
 
     static final String ADMIN_EMAIL = "admin@teste.local";
-    static final String ADMIN_PASSWORD = "senha-admin-teste"; // definida em application-test.yml
+    static final String ADMIN_PASSWORD = "senha-admin-teste";
 
     private TestAuth() {}
 

@@ -2,10 +2,6 @@ package br.com.ecosense.security;
 
 import br.com.ecosense.persistence.UserEntity;
 
-/**
- * Usuário autenticado na requisição atual. Nos controllers: {@code @AuthenticationPrincipal AuthUser user}.
- * Montado a partir do banco a cada requisição, então mudança de perfil vale na hora.
- */
 public record AuthUser(long id, String email, String name, String role) {
 
     public boolean isAdmin() {

@@ -15,7 +15,6 @@ import br.com.ecosense.config.EcoSenseProperties;
 import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 import br.com.ecosense.service.ReadingService.DeviceData;
 
-/** Monta o estado atual de cada dispositivo: cadastro (configuração) + última leitura do ThingSpeak. */
 @Service
 public class DeviceService {
 
@@ -31,12 +30,10 @@ public class DeviceService {
         this.clock = clock;
     }
 
-    /** Dispositivos cadastrados (no banco). */
     public List<DeviceConfig> configs() {
         return catalog.all();
     }
 
-    /** Dispositivos de uma categoria (ALL = todos). */
     public List<DeviceConfig> configs(DeviceGroup group) {
         return catalog.all().stream().filter(group::includes).toList();
     }
@@ -54,7 +51,6 @@ public class DeviceService {
         return toDevice(config(id));
     }
 
-    /** Online = transmitiu dentro do limite (o maior entre offlineAfter e 3× o intervalo de transmissão). */
     public boolean isOnline(DeviceConfig d, DeviceData data) {
         if (data.latest() == null) return false;
         Duration limit = Duration.ofMinutes(3L * d.txInterval());
@@ -71,7 +67,6 @@ public class DeviceService {
         Double avgHarvestedW = Stats.mean(last24h, Reading::harvestedW);
 
         int battery = latest != null && latest.battery() != null ? (int) Math.round(latest.battery()) : 0;
-        /* canal sem a leitura (field = none) → null ("não medido"); medido mas offline → 0 */
         Double consumptionWhDay = !d.fields().measuresConsumption() ? null
                 : online && avgConsumptionW != null ? Stats.sig(avgConsumptionW * 24) : 0;
         Double temperature = online && latest.temperature() != null ? Stats.round(latest.temperature(), 1) : null;
