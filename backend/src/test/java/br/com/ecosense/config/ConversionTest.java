@@ -28,8 +28,8 @@ class ConversionTest {
     @Test
     void escalaConverteMiliwattEInverteSinalSemFicarNegativo() {
         Conversion c = new Conversion(null, null, -0.001, 0.001, null);
-        assertThat(c.consumption(-120d)).isCloseTo(0.12, offset(1e-9)); // descarga de 120 mW = consumo 0,12 W
-        assertThat(c.consumption(50d)).isEqualTo(0);                     // carregando: consumo não fica negativo
+        assertThat(c.consumption(-120d)).isCloseTo(0.12, offset(1e-9));
+        assertThat(c.consumption(50d)).isEqualTo(0);
         assertThat(c.harvested(700d)).isCloseTo(0.7, offset(1e-9));
     }
 }

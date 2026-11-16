@@ -1,9 +1,6 @@
-/* ===== TELA DE LOGIN ===== */
 (()=>{
- /* tema salvo pelos portais */
  try{document.documentElement.dataset.theme=localStorage.getItem('eh-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){document.documentElement.dataset.theme='dark'}
  const next=auth.safeNext(new URLSearchParams(location.search).get('next')||'');
- /* usuário comum não volta para o painel admin */
  const target=s=>next&&!(next.includes('/admin/')&&!auth.isAdmin(s))?next:auth.home(s);
  const current=auth.get();
  if(current){location.replace(target(current));return}

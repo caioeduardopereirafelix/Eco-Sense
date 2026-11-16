@@ -15,15 +15,10 @@ import org.springframework.web.util.UriBuilder;
 
 import br.com.ecosense.config.EcoSenseProperties;
 
-/**
- * Cliente da API REST do ThingSpeak (GET /channels/{id}/feeds.json).
- * Ativo quando {@code ecosense.thingspeak.simulate=false}.
- */
 @Component
 @ConditionalOnProperty(name = "ecosense.thingspeak.simulate", havingValue = "false", matchIfMissing = true)
 public class HttpThingSpeakClient implements ThingSpeakClient {
 
-    /** O ThingSpeak espera "AAAA-MM-DD HH:NN:SS" no fuso informado em {@code timezone}. */
     private static final DateTimeFormatter TS_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
 
@@ -81,7 +76,6 @@ public class HttpThingSpeakClient implements ThingSpeakClient {
         return v == null || v.toString().isBlank() ? null : v.toString().trim();
     }
 
-    /** O ThingSpeak usa "0.0" quando o canal não tem localização: vira null. */
     private static Double number(Object v) {
         try {
             double d = Double.parseDouble(String.valueOf(v));
@@ -105,6 +99,5 @@ public class HttpThingSpeakClient implements ThingSpeakClient {
         return feeds;
     }
 
-    /** Resposta do ThingSpeak: {"channel": {...}, "feeds": [{"created_at": "...", "field1": "..."}]} */
     record FeedsResponse(Map<String, Object> channel, List<Map<String, Object>> feeds) {}
 }

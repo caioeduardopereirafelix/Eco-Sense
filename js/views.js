@@ -1,40 +1,25 @@
-/* ===== TELAS E COMPONENTES COMPARTILHADOS (usuário e admin) =====
-   O que é igual nos dois portais mora aqui; as diferenças entram como opções.
-   Depende de shared.js (esc, num, tag, bar, col, chart, nowLine, filters, daysTag, kvRow…). */
-
-/* ---------- utilitários ---------- */
 const byId=list=>Object.fromEntries(list.map(x=>[x.id,x]));
-/* 'AAAA-MM-DD' → 'DD/MM/AAAA' */
 const formatDay=value=>value?value.split('-').reverse().join('/'):'';
-/* tag de status da manutenção ("Em rota" vira a classe s-Em-rota) */
 const requestTag=status=>`<span class="tag s-${String(status).replace(/ /g,'-')}">${esc(status)}</span>`;
 
-/* ---------- alertas lidos nesta sessão (a API devolve cópias, então o estado fica aqui) ---------- */
 const readIds=new Set();
 const withRead=list=>list.map(a=>({...a,read:readIds.has(String(a.id))}));
 
-/* ---------- dispositivos ---------- */
-/* energia por dia (Wh/dia); null = o canal não mede essa leitura → "—" */
 const perDay=wh=>wh==null?'—':`${energy(wh)}/dia`;
 const harvestText=(d,emptyLabel)=>d.harvesting
  ?`${perDay(d.harvesting.collected)} <span class="mu">(${esc(d.harvesting.type)})</span>`
  :`<span class="mu">${emptyLabel}</span>`;
-/* topo comum dos cards de dispositivo: local, nome, status e bateria */
 const deviceCardHead=(d,{showId=false}={})=>`<h3>${showId?`${esc(d.id)} · `:''}${esc(d.location||'Local não informado')}</h3>
    <div class="big" style="font-size:20px">${esc(d.name)}</div>
    <div style="margin-top:6px">${tag(d.status)}</div>
    ${bar(d.battery)}
    <div class="mu">Bateria ${num(d.battery)}% · Última comunicação ${esc(timeAgo(d.lastSeenAt))}</div>`;
 
-/* ---------- energia: fontes, baterias e consumidores ---------- */
 const sourceCard=(x,{showUpdated=false}={})=>`<div class="card"><h3>${esc(x.name)}</h3><div class="big">${bigKwh(x.energyKwh)}</div><div class="mu">${x.efficiencyPct!=null?`Eficiência ${pct(x.efficiencyPct)} · `:''}${tag(x.status)}</div>${showUpdated?`<div class="mu" style="margin-top:6px">Atualizado ${esc(timeAgo(x.updatedAt))}</div>`:''}</div>`;
-/* Participação de cada dispositivo na geração de hoje (s = resposta de api.getSources(group)).
-   Mostra de onde vem o total: um sistema solar pode responder por quase tudo. */
 const shareCard=s=>{
  const multi=s.length>1;
  const all=s.flatMap(x=>x.devices.map(d=>({...d,source:x.name}))).sort((a,b)=>b.energyKwh-a.energyKwh);
  const rows=all.filter(d=>d.energyKwh>0),idle=all.filter(d=>!(d.energyKwh>0));
- /* parcela pequena, mas não zero (ex.: sensor em mWh ao lado de uma casa em kWh): "< 0,1%" */
  const share=d=>d.sharePct==null?null:`${d.sharePct===0?'< 0,1%':pct(d.sharePct)}${multi?` de ${d.source}`:''}`;
  const row=d=>{const info=[group==='todos'&&GROUP_LABEL[d.group],kwh(d.energyKwh),share(d)].filter(Boolean).map(esc).join(' · ');
   return `<div style="margin-bottom:10px">${esc(d.name)} <span class="mu">${info}</span>${bar(d.sharePct||0,'var(--gen)')}</div>`};
@@ -48,35 +33,25 @@ const batteryCard=x=>{
  const cells=[...Array(10)].map((_,i)=>`<i style="${i<filled?`background:${charging?'var(--con)':col(x.pct)}`:''}"></i>`).join('');
  return `<div class="card"><h3>${esc(x.name)} · ${esc(x.type)}</h3><div class="big">${num(x.pct)}<small>% de ${kwh(x.capacityKwh)}</small></div>
    <div class="batt">${cells}</div>${tag(x.status)}${charging?' <span class="mu">⚡ recebendo carga</span>':''}</div>`};
-/* barras com as 3 cargas de maior consumo (conteúdo do card, sem o card) */
 const topConsumers=loads=>{
- /* só cargas que medem consumo (currentW null = canal sem essa leitura) */
  const top=loads.filter(x=>x.currentW!=null).sort((a,b)=>b.currentW-a.currentW).slice(0,3),max=top.length&&top[0].currentW||1;
  return top.map(x=>`<div>${esc(x.name)} <span class="mu">${power(x.currentW)}</span>${bar(x.currentW/max*100,'var(--con)')}</div>`).join('')||'<div class="mu">Sem dados de consumo.</div>'};
 
-/* variação vs. ontem: ▲/▼ com a cor certa. higherIsGood: true para geração, false para consumo */
 const changeText=(changePct,higherIsGood,suffix=' vs. ontem')=>{
  if(changePct==null)return'<span class="mu">sem comparação com ontem</span>';
  const up=changePct>=0,good=up===higherIsGood;
  return `<span class="${good?'up':'dn'}">${up?'▲':'▼'} ${pct(Math.abs(changePct))}${suffix}</span>`};
 
-/* armazenamento: "6,8 kWh de 10 kWh"; sem baterias do sistema cadastradas, o % é a média dos dispositivos */
 const storageText=s=>s.capacityKwh!=null?`${kwh(s.storedKwh)} de ${kwh(s.capacityKwh)}`:'Média das baterias dos dispositivos';
 
-/* ---------- histórico: rótulos e unidade a partir da resposta da API ---------- */
 const historyLabels=h=>h.timestamps.map(t=>timeLabel(t,h.step));
-/* energia do histórico (kWh) na escala adequada: {unit:'mWh/h', gen:[…], con:[…]} */
 const historyEnergy=h=>{const toWh=l=>l.map(v=>v==null?null:v*1000),g=toWh(h.generatedKwh),c=toWh(h.consumedKwh),s=energyScale(g,c);
  return{unit:`${s.unit}/${h.step==='hour'?'h':'dia'}`,gen:s.scale(g),con:s.scale(c)}};
 
-/* ---------- tela: histórico ----------
-   custom: inclui o filtro "Personalizado" (admin); storageTitle: título do gráfico de bateria */
 async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}){
  const options=[['hoje','Hoje'],['7d','7 dias'],['30d','30 dias'],...(custom?[['custom','Personalizado']]:[])];
- /* período personalizado: começa nos últimos 14 dias; o back-end guarda até 31 dias */
  const isoDay=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
  const daysAgo=n=>{const d=new Date();d.setDate(d.getDate()-n);return isoDay(d)};
- /* período escolhido sobrevive à atualização automática */
  const st=pageState({range:'hoje',period:{from:daysAgo(13),to:daysAgo(0)}});
  const period=st.period,minDay=daysAgo(30),maxDay=daysAgo(0);
  const draw=async k=>{
@@ -100,12 +75,9 @@ async function renderHistory({custom=false,storageTitle='Bateria armazenada'}={}
   chart('c3','line',labels,[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})};
  await draw(st.range)}
 
-/* ---------- tela: previsão de bateria ----------
-   detailed (admin): mostra ID, local, exposição solar e contexto sazonal */
 async function renderForecast({detailed=false}={}){
  const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
  const fById=byId(fc.items);
- /* ordem: menor autonomia primeiro, depois saldo negativo, sustentáveis e sem leitura */
  const rank=r=>r.f.sustainable?1000:r.f.daysLeft!=null?r.f.daysLeft:r.f.deficit?900:2000;
  const rows=devices.map(d=>({d,f:fById[d.id]})).sort((a,b)=>rank(a)-rank(b));
  const withReading=rows.filter(r=>hasForecast(r.f));
@@ -113,7 +85,6 @@ async function renderForecast({detailed=false}={}){
  const first=rows.find(r=>r.f.daysLeft!=null&&!r.f.sustainable);
  const suns=rows.map(r=>r.f.sunHours).filter(h=>h!=null);
  const avgSun=suns.length?num(+(suns.reduce((a,b)=>a+b,0)/suns.length).toFixed(1)):'—';
- /* dispositivo e período escolhidos sobrevivem à atualização automática */
  const st=pageState({sel:null,range:'24h'});
  if(!withReading.some(r=>r.d.id===st.sel))st.sel=(first||withReading[0]||rows[0]).d.id;
  let drawToken=0;
@@ -153,7 +124,6 @@ async function renderForecast({detailed=false}={}){
   charts.forEach(c=>c.destroy());charts=[];
   $('#pinfo').innerHTML=info(rows.find(x=>x.d.id===st.sel));
   const line=(c,label,data,dash)=>({borderColor:css(c),label,data,fill:false,borderDash:dash||[]});
-  /* rótulos relativos ao agora: "−3h", "agora", "+2d" */
   const labels=s.timestamps.map((_,i)=>{const k=i-s.nowIndex;return k===0?'agora':`${k<0?'−':'+'}${Math.abs(k)}${s.step==='hour'?'h':'d'}`});
   const es=energyScale(s.consumption.measured,s.consumption.predicted);$('#pcunit').textContent=es.unit;
   chart('c1','line',labels,[line('--con','Real',es.scale(s.consumption.measured)),line('--gen','Previsto',es.scale(s.consumption.predicted),[6,4])],{min:0},[nowLine(s.nowIndex)]);
@@ -162,8 +132,6 @@ async function renderForecast({detailed=false}={}){
  V.onclick=e=>{const btn=e.target.closest('[data-pick]'),id=btn&&btn.dataset.pick;if(id){st.sel=id;$('#pdev').value=id;drawCharts();$('#pcharts').scrollIntoView()}};
  drawRange();await drawCharts()}
 
-/* ---------- minha conta: nome e troca de senha (usuário e admin) ---------- */
-/* HTML dos cards; depois de inserir na tela, chame bindAccount(). me = resposta de api.getMe() */
 const accountCards=me=>`<div class="card" style="max-width:640px;margin-bottom:16px">
   <h3>Meu perfil</h3>
   <div class="set"><label for="acname"><b>Nome</b></label><input id="acname" type="text" value="${esc(me.name)}" maxlength="80"></div>
@@ -205,7 +173,7 @@ function bindAccount(){
   if(next!==confirm)return fail('A confirmação não confere com a nova senha.');
   const btn=form.querySelector('[type=submit]');btn.disabled=true;
   try{
-   auth.save(await api.changePassword(current,next)); /* token novo: esta sessão continua */
+   auth.save(await api.changePassword(current,next));
    form.reset();$('#pwok').textContent='Senha alterada.'}
   catch(err){fail(err.message)}
   btn.disabled=false};

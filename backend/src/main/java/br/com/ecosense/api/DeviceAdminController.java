@@ -24,10 +24,6 @@ import br.com.ecosense.service.DeviceService;
 import br.com.ecosense.thingspeak.ChannelMeta;
 import br.com.ecosense.thingspeak.ThingSpeakClient;
 
-/**
- * Cadastro de dispositivos (painel admin): criar, editar, remover e consultar um canal do
- * ThingSpeak para descobrir os nomes dos fields.
- */
 @RestController
 @RequestMapping("/api")
 public class DeviceAdminController {
@@ -45,7 +41,6 @@ public class DeviceAdminController {
         this.props = props;
     }
 
-    /** Configuração editável (canal, fields, conversões) — o GET /devices/{id} traz as leituras. */
     @GetMapping("/devices/{id}/settings")
     public DeviceSettings settings(@PathVariable String id) {
         return catalog.settings(id);

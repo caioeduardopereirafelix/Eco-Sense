@@ -23,12 +23,10 @@ import br.com.ecosense.thingspeak.ChannelMeta;
 import br.com.ecosense.thingspeak.Feed;
 import br.com.ecosense.thingspeak.ThingSpeakClient;
 
-/** Primeira carga: pedidos em paralelo (com limite), uma busca por dispositivo e carga ao ligar. */
 class ReadingServiceTest {
 
     static final Instant NOW = Instant.parse("2026-11-14T12:30:00Z");
 
-    /** ThingSpeak falso: cada pedido demora um pouco, devolve uma entrada por hora e conta tudo. */
     static class CountingClient implements ThingSpeakClient {
         final AtomicInteger latest = new AtomicInteger();
         final AtomicInteger averaged = new AtomicInteger();
@@ -85,7 +83,6 @@ class ReadingServiceTest {
                 channel, null, chunkDays, null, null);
     }
 
-    /** pedaços de 2 dias em 31 dias = 16 pedidos de histórico */
     static final int CHUNKS = (int) Math.ceil(ReadingService.HISTORY_DAYS / 2.0);
 
     @Test
@@ -94,7 +91,6 @@ class ReadingServiceTest {
 
         assertThat(client.averaged).hasValue(CHUNKS);
         assertThat(client.maxRunning.get()).isGreaterThan(1).isLessThanOrEqualTo(ReadingService.MAX_PARALLEL_REQUESTS);
-        /* uma leitura por hora, em ordem e sem repetição, cobrindo os 31 dias */
         List<Instant> hours = data.hourly().stream().map(Reading::at).toList();
         assertThat(hours).isSorted().doesNotHaveDuplicates();
         assertThat(hours).hasSize(ReadingService.HISTORY_DAYS * 24);
@@ -133,7 +129,7 @@ class ReadingServiceTest {
 
         assertThat(client.latest).hasValue(3);
         devices.forEach(service::data);
-        assertThat(client.latest.get() + client.averaged.get()).isEqualTo(calls); // tudo veio do cache
+        assertThat(client.latest.get() + client.averaged.get()).isEqualTo(calls);
     }
 
     @Test
@@ -143,7 +139,6 @@ class ReadingServiceTest {
 
         assertThat(data.latest()).isNull();
         assertThat(data.hourly()).isEmpty();
-        /* a falha também fica em cache até vencer: não repete os pedidos a cada tela */
         int calls = client.averaged.get();
         service.data(device("X", 7, 2));
         assertThat(client.averaged).hasValue(calls);

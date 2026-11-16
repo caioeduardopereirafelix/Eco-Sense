@@ -13,7 +13,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import br.com.ecosense.api.ApiDtos.ErrorBody;
 
-/** Todo erro sai como {"message": "..."} — o front mostra essa mensagem ao usuário. */
 @RestControllerAdvice
 public class ApiExceptionHandler {
 

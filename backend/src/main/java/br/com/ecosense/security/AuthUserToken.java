@@ -6,7 +6,6 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-/** Autenticação de uma requisição com token válido: o principal é o {@link AuthUser}. */
 class AuthUserToken extends AbstractAuthenticationToken {
 
     private final AuthUser user;

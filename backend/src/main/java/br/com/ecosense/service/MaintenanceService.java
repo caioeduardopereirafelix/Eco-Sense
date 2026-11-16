@@ -19,7 +19,6 @@ import br.com.ecosense.persistence.MaintenanceRequestEntity;
 import br.com.ecosense.persistence.MaintenanceRequestRepository;
 import br.com.ecosense.security.AuthUser;
 
-/** Solicitações de manutenção, guardadas no banco (tabela maintenance_requests). */
 @Service
 public class MaintenanceService {
 
@@ -38,7 +37,6 @@ public class MaintenanceService {
         this.clock = clock;
     }
 
-    /** Administrador vê todos os pedidos; usuário comum, só os que ele mesmo fez. */
     public List<MaintenanceRequest> list(AuthUser user) {
         var all = user.isAdmin() ? repository.findAllByOrderByIdAsc()
                 : repository.findAllByRequestedByIdOrderByIdAsc(user.id());
@@ -47,7 +45,7 @@ public class MaintenanceService {
 
     @Transactional
     public MaintenanceRequest create(NewMaintenanceRequest body, AuthUser user) {
-        devices.config(body.deviceId()); // 404 se o dispositivo não existir
+        devices.config(body.deviceId());
         MaintenanceRequestEntity e = new MaintenanceRequestEntity();
         e.setDeviceId(body.deviceId());
         e.setReason(body.reason().trim());
@@ -59,10 +57,6 @@ public class MaintenanceService {
         return toDto(repository.save(e));
     }
 
-    /**
-     * Regras: data vazia mantém a já agendada; voltar para "Recebida" limpa a data;
-     * "Agendada" exige data válida e não passada.
-     */
     @Transactional
     public MaintenanceRequest update(long id, MaintenanceUpdate body) {
         if (!STATUSES.contains(body.status())) throw ApiException.badRequest("Status de manutenção inválido.");

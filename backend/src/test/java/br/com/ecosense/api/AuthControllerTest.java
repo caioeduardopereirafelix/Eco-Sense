@@ -22,7 +22,6 @@ import org.springframework.web.context.WebApplicationContext;
 
 import com.jayway.jsonpath.JsonPath;
 
-/** Login, perfis (ADMIN × USER), conta e gestão de usuários. */
 @SpringBootTest
 @ActiveProfiles("test")
 class AuthControllerTest {
@@ -38,7 +37,6 @@ class AuthControllerTest {
         admin = TestAuth.asAdmin(ctx);
     }
 
-    /** Cria um usuário comum pelo admin e devolve o id. */
     private long createUser(String email, String password) throws Exception {
         String body = admin.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Maria Teste\",\"email\":\"" + email + "\",\"role\":\"USER\",\"password\":\"" + password + "\"}"))
@@ -152,13 +150,11 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Informe um e-mail válido."));
 
-        /* promover a admin vale na hora, sem novo login */
         admin.perform(put("/api/users/" + id).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"Gestor\",\"email\":\"gestao@teste.local\",\"role\":\"ADMIN\"}"))
                 .andExpect(jsonPath("$.role").value("ADMIN"));
         TestAuth.as(ctx, userToken).perform(get("/api/users")).andExpect(status().isOk());
 
-        /* redefinir a senha derruba a sessão do usuário */
         admin.perform(put("/api/users/" + id + "/password").contentType(MediaType.APPLICATION_JSON)
                 .content("{\"password\":\"redefinida-1\"}")).andExpect(status().isNoContent());
         TestAuth.as(ctx, userToken).perform(get("/api/me")).andExpect(status().isUnauthorized());

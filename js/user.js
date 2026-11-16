@@ -1,17 +1,9 @@
-/* ===== PORTAL DO USUÁRIO (rota raiz "/") =====
-   Só funções de quem acompanha os próprios dispositivos: ver estado, previsão, energia,
-   histórico e alertas; pedir manutenção; ajustar a própria conta e notificações.
-   Funções de administração (cadastro/configuração de dispositivos, roteirização e agenda de
-   manutenção, parâmetros do sistema) ficam no painel /admin. */
-
-/* ---------- preferências de notificação (salvas neste navegador; nome e e-mail vêm do login) ---------- */
 const PREF_KEY='eh-user-prefs';
 const DEFAULT_PREFS={critical:true,high:true};
 function loadPrefs(){try{return{...DEFAULT_PREFS,...JSON.parse(localStorage.getItem(PREF_KEY)||'{}')}}catch(e){return{...DEFAULT_PREFS}}}
 function savePrefs(p){try{localStorage.setItem(PREF_KEY,JSON.stringify(p));return true}catch(e){return false}}
 let prefs=loadPrefs();
 
-/* ---------- alertas do usuário: respeitam as preferências de notificação ---------- */
 let alertsBase=null;
 async function userAlerts(){
  if(!alertsBase)alertsBase=await api.getAlerts();
@@ -23,16 +15,13 @@ function bindAlerts(redraw){
   else readIds.add(b.dataset.read);
   redraw()};
 }
-/* dispositivo precisa de atenção: offline, bateria baixa ou esgotando em até 7 dias */
 const needsAttention=(d,f)=>d.status==='Offline'||d.battery<20||(f.daysLeft!=null&&f.daysLeft<=7);
 
-/* ---------- telas ---------- */
 const pages={
 async inicio(){
- alertsBase=null; /* busca alertas novos a cada carga (inclusive na atualização automática) */
+ alertsBase=null;
  const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(group),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje',{group})]);
  const fById=byId(fc.items);
- /* o aviso de atenção vale para todos os dispositivos; os cards seguem o grupo escolhido */
  const needs=devices.filter(d=>needsAttention(d,fById[d.id]));
  const banner=needs.length
   ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção. <a href="#dispositivos">Ver meus dispositivos</a></div>`
@@ -52,7 +41,6 @@ async inicio(){
 async dispositivos(){
  const [devices,fc,reqs]=await Promise.all([api.getDevices(),api.getForecasts(),api.getMaintenanceRequests()]);
  const fById=byId(fc.items);
- /* filtro sobrevive à atualização automática (com o pedido de manutenção aberto ela fica pausada) */
  const st=pageState({filter:'all'});
  let openForm=null,notice='';
  const filterFns={all:()=>true,att:d=>needsAttention(d,fById[d.id]),on:d=>d.status==='Online',off:d=>d.status==='Offline'};

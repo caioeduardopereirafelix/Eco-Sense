@@ -14,10 +14,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Formatos de resposta da API, exatamente como descritos em docs/API.md.
- * Números puros (unidade no nome do campo) e datas em ISO 8601.
- */
 public final class ApiDtos {
 
     private ApiDtos() {}
@@ -25,36 +21,24 @@ public final class ApiDtos {
     public record Overview(Generation generation, Consumption consumption, Storage storage, DeviceCount devices) {}
     public record Generation(double todayKwh, Double changePct) {}
     public record Consumption(double nowW, double todayKwh, Double changePct) {}
-    /** storedKwh/capacityKwh são null quando não há armazenamento configurado (pct = média dos dispositivos). */
     public record Storage(Integer pct, Double storedKwh, Double capacityKwh, String status) {}
     public record DeviceCount(int total, int online, int offline) {}
 
-    /** devices: participação de cada dispositivo na energia de hoje desta fonte, do maior para o menor. */
     public record Source(String name, double energyKwh, Double efficiencyPct, String status, Instant updatedAt,
                          List<SourceDevice> devices) {}
-    /** group: iot | sistemas. sharePct: % da energia da fonte (null quando a fonte não gerou nada hoje). */
     public record SourceDevice(String id, String name, String group, double energyKwh, Double sharePct) {}
-    /** currentW/avgW são null quando o canal não mede consumo. */
     public record Load(String name, String type, Double currentW, Double avgW, String priority, String status) {}
     public record Battery(String name, String type, double capacityKwh, Integer pct, String status) {}
 
-    /** battery em %, consumption e harvesting.collected em Wh/dia (null se o canal não mede), temperature em °C, txInterval em min. */
     public record Device(String id, String name, String location, String region,
                          Double latitude, Double longitude, String status,
                          int battery, Double consumption, Instant lastSeenAt,
                          Double temperature, int txInterval, Harvesting harvesting) {}
     public record Harvesting(String type, Double collected) {}
 
-    /** level: critical | high | warning | info */
     public record Alert(String id, String level, String title, String message, Instant createdAt) {}
 
     public record Forecasts(String season, Instant updatedAt, List<ForecastItem> items) {}
-    /**
-     * daysLeft: dias até esgotar (bateria caindo). sustainable: bateria estável/subindo e saldo não negativo,
-     * ou caindo devagar (mais de 30 dias) com saldo positivo — nesse caso daysLeft também vem preenchido.
-     * deficit: bateria estável/subindo, mas consome mais do que coleta. balanceWhDay: coleta − consumo (Wh/dia).
-     * sunHours: horas de sol por dia, cadastradas ou medidas (horas com geração nos últimos 7 dias).
-     */
     public record ForecastItem(String id, Integer daysLeft, boolean sustainable, boolean deficit,
                                Double balanceWhDay, Integer confidence, Double sunHours) {}
 
@@ -64,7 +48,6 @@ public final class ApiDtos {
     public record History(String step, List<Instant> timestamps,
                           List<Double> generatedKwh, List<Double> consumedKwh, List<Double> storagePct) {}
 
-    /** requestedBy: nome de quem pediu (null em pedidos antigos, anteriores ao login) */
     public record MaintenanceRequest(long id, String deviceId, String reason, String note,
                                      String status, Instant createdAt, LocalDate scheduledFor,
                                      String requestedBy) {}
@@ -76,21 +59,16 @@ public final class ApiDtos {
 
     public record MaintenanceUpdate(
             @NotBlank(message = "Informe o status.") String status,
-            /* AAAA-MM-DD; vazio/null mantém a data atual */
             String scheduledFor) {}
 
     public record ErrorBody(String message) {}
-
-    /* ---------------- login, conta e usuários ---------------- */
 
     public record LoginRequest(
             @NotBlank(message = "Informe o e-mail.") String email,
             @NotBlank(message = "Informe a senha.") String password) {}
 
-    /** role: ADMIN | USER */
     public record UserInfo(long id, String name, String email, String role, Instant createdAt) {}
 
-    /** Resposta do login (e da troca de senha, que gera um token novo). */
     public record Session(String token, Instant expiresAt, UserInfo user) {}
 
     public record ProfileUpdate(
@@ -119,12 +97,6 @@ public final class ApiDtos {
             @NotBlank(message = "Informe a nova senha.")
             @Size(min = 8, max = 72, message = "A senha deve ter de 8 a 72 caracteres.") String password) {}
 
-    /* ---------------- cadastro de dispositivos (admin) ---------------- */
-
-    /**
-     * Configuração editável de um dispositivo (GET/POST/PUT). Não inclui leituras.
-     * fields: em qual field do canal está cada leitura (field1..field8 ou none).
-     */
     public record DeviceSettings(
             @Pattern(regexp = "[A-Za-z0-9_-]{1,40}", message = "O ID deve ter até 40 caracteres: letras, números, - ou _.")
             String id,
@@ -149,11 +121,9 @@ public final class ApiDtos {
             @Pattern(regexp = "field[1-8]|none", message = "Field inválido (use field1 a field8 ou none).") String temperature,
             @Pattern(regexp = "field[1-8]|none", message = "Field inválido (use field1 a field8 ou none).") String harvested) {}
 
-    /** Conversões opcionais: tensão → % e fatores de escala (ex.: 0.001 para mW → W). */
     public record ConversionSettings(Double batteryVoltageMin, Double batteryVoltageMax,
                                      Double consumptionScale, Double harvestedScale, Double temperatureScale) {}
 
-    /** Informações de um canal do ThingSpeak, para ajudar a preencher o cadastro. */
     public record ChannelInfo(long channelId, String name, String description, Double latitude, Double longitude,
                               java.util.Map<String, String> fields, Instant lastEntryAt) {}
 }

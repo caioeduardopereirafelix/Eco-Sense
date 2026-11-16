@@ -27,11 +27,6 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import br.com.ecosense.config.AuthProperties;
 import br.com.ecosense.persistence.UserEntity;
 
-/**
- * Emite e valida os tokens de acesso (JWT assinado com HMAC-SHA256).
- * O token leva o id do usuário (sub), o perfil e a versão do token (ver); o front o envia no
- * cabeçalho {@code Authorization: Bearer <token>}. Não há sessão no servidor.
- */
 @Service
 public class TokenService {
 
@@ -51,7 +46,7 @@ public class TokenService {
         SecretKey key = key(props.jwtSecret());
         this.encoder = new NimbusJwtEncoder(new ImmutableSecret<>(key));
         NimbusJwtDecoder nimbus = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
-        nimbus.setJwtValidator(JwtValidators.createDefaultWithIssuer(ISSUER)); // validade + emissor
+        nimbus.setJwtValidator(JwtValidators.createDefaultWithIssuer(ISSUER));
         this.decoder = nimbus;
     }
 
@@ -70,7 +65,6 @@ public class TokenService {
         return new IssuedToken(encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue(), expiresAt);
     }
 
-    /** Usado pelo Spring Security para validar assinatura e validade dos tokens recebidos. */
     public JwtDecoder decoder() {
         return decoder;
     }

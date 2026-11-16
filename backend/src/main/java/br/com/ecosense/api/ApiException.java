@@ -2,7 +2,6 @@ package br.com.ecosense.api;
 
 import org.springframework.http.HttpStatus;
 
-/** Erro com status HTTP e mensagem pronta para mostrar ao usuário. */
 public class ApiException extends RuntimeException {
 
     private final HttpStatus status;

@@ -28,25 +28,14 @@ import br.com.ecosense.api.ApiDtos.ErrorBody;
 import br.com.ecosense.persistence.UserEntity;
 import br.com.ecosense.persistence.UserRepository;
 
-/**
- * Regras de acesso da API:
- * <ul>
- *   <li>público: {@code POST /api/auth/login};</li>
- *   <li>só ADMIN: cadastro de dispositivos, consulta de canais do ThingSpeak, gestão de usuários e
- *       atualização de status das manutenções;</li>
- *   <li>qualquer usuário logado (USER ou ADMIN): o resto de {@code /api/**}.</li>
- * </ul>
- * Sem sessão no servidor: cada requisição traz o token JWT no cabeçalho Authorization.
- */
 @Configuration
 public class SecurityConfig {
 
     @Bean
     SecurityFilterChain api(HttpSecurity http, UserRepository users, ObjectMapper json) throws Exception {
         http
-                /* sem cookies de sessão, não há CSRF a proteger: o token vai no cabeçalho */
                 .csrf(c -> c.disable())
-                .cors(Customizer.withDefaults()) // usa as origens de ecosense.cors-origins (AppConfig)
+                .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -82,10 +71,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Token válido → usuário atual, lido do banco. Usuário removido ou senha trocada depois da
-     * emissão do token (versão diferente) → 401, mesmo que o token ainda não tenha expirado.
-     */
     static Converter<Jwt, AbstractAuthenticationToken> currentUser(UserRepository users) {
         return jwt -> {
             UserEntity user;

@@ -21,27 +21,11 @@ import br.com.ecosense.config.EcoSenseProperties.DeviceConfig;
 import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
 import br.com.ecosense.service.DeviceCatalog;
 
-/**
- * SÓ PARA TESTES: gera leituras no mesmo formato do ThingSpeak, para os testes automáticos rodarem
- * sem internet e com dados previsíveis. Ativo com {@code ecosense.thingspeak.simulate=true}
- * (perfil "test", src/test/resources/application-test.yml). Cada canal se comporta conforme
- * {@code test-sim.channels.<channelId>}. Os valores são determinísticos (mesma hora = mesmo valor).
- */
 @Component
 @ConditionalOnProperty(name = "ecosense.thingspeak.simulate", havingValue = "true")
 @EnableConfigurationProperties(SimulatedThingSpeakClient.SimulationProperties.class)
 public class SimulatedThingSpeakClient implements ThingSpeakClient {
 
-    /**
-     * Comportamento de um canal simulado.
-     *
-     * @param battery        % de bateria agora
-     * @param trendPerDay    variação da bateria em pontos percentuais por dia
-     * @param consumptionW   consumo médio em W
-     * @param harvestedW     coleta média em W (média do dia inteiro)
-     * @param temperature    temperatura média em °C
-     * @param offlineMinutes há quantos minutos parou de transmitir (null = online)
-     */
     public record Sim(Double battery, Double trendPerDay, Double consumptionW,
                       Double harvestedW, Double temperature, Integer offlineMinutes) {
         static final Sim DEFAULT = new Sim(null, null, null, null, null, null);
@@ -55,7 +39,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         }
     }
 
-    /** Parâmetros dos canais simulados (prefixo {@code test-sim}). */
     @ConfigurationProperties(prefix = "test-sim")
     public record SimulationProperties(Map<Long, Sim> channels) {
         public SimulationProperties {
@@ -66,7 +49,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
     private final EcoSenseProperties props;
     private final SimulationProperties sims;
     private final Clock clock;
-    /* lazy: o catálogo depende (indiretamente) deste cliente */
     private final ObjectProvider<DeviceCatalog> catalog;
 
     public SimulatedThingSpeakClient(EcoSenseProperties props, SimulationProperties sims, Clock clock,
@@ -100,7 +82,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         return feeds;
     }
 
-    /** Canal simulado: nomes de fields padrão; nome e local do dispositivo que usa o canal, se houver. */
     @Override
     public ChannelMeta channel(long channelId, String readApiKey) {
         Optional<DeviceConfig> device = deviceFor(channelId);
@@ -117,7 +98,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
                 fields, lastTransmission(channelId, clock.instant()));
     }
 
-    /** Canais "offline" param de transmitir há {@code offlineMinutes}. */
     private Instant lastTransmission(long channelId, Instant now) {
         Integer offline = sim(channelId).offlineMinutes();
         return offline == null ? now.minusSeconds(30) : now.minus(Duration.ofMinutes(offline));
@@ -150,7 +130,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         double battery = clamp(s.battery() + s.trendPerDay() * daysFromNow + noise(channel, t, 0.8), 0, 100);
         double consumption = Math.max(0, s.consumptionW() * (1 + 0.12 * Math.sin((hour + channel) * 0.55)
                 + noise(channel, t, 0.04)));
-        /* solar segue o sol (0 à noite); multiplicar por PI mantém a média diária = harvestedW */
         double harvestFactor = "Solar".equalsIgnoreCase(d.harvestingType())
                 ? Math.max(0, Math.sin((hour - 6) / 12.0 * Math.PI)) * Math.PI
                 : 1 + noise(channel, t, 0.1);
@@ -166,7 +145,6 @@ public class SimulatedThingSpeakClient implements ThingSpeakClient {
         return new Feed(t, values);
     }
 
-    /** Ruído determinístico em [-amplitude, +amplitude], fixo para cada canal e hora. */
     private static double noise(long channel, Instant t, double amplitude) {
         long hourIndex = t.getEpochSecond() / 3600;
         double x = Math.sin(channel * 12.9898 + hourIndex * 78.233) * 43758.5453;

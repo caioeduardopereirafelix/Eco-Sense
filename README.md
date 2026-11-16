@@ -92,6 +92,8 @@ dos dispositivos do ThingSpeak (o log avisa `Leituras carregadas`); depois disso
 **4. Entre** com o e-mail e a senha de administrador do `.env`. Em **Usuários**, crie um usuário comum
 para ver o portal do outro perfil.
 
+Para publicar na internet (Oracle Cloud ou Railway, com MySQL), siga o [DEPLOY.md](DEPLOY.md).
+
 Problemas comuns e detalhes (MySQL, chave do ThingSpeak, primeiro acesso, como cadastrar dispositivos) estão
 no [README do back-end](backend/README.md).
 

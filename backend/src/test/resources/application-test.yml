@@ -1,8 +1,3 @@
-# Configuração dos TESTES automáticos (perfil "test"): sem internet e sem MySQL.
-# - banco H2 em memória
-# - leituras geradas pelo SimulatedThingSpeakClient (src/test), não pelo ThingSpeak
-# As listas abaixo substituem as do application.yml principal.
-
 spring:
   datasource:
     url: jdbc:h2:mem:ecosense-test;DB_CLOSE_DELAY=-1;MODE=MySQL
@@ -11,14 +6,12 @@ spring:
 
 ecosense:
   auth:
-    # chave e senha fixas SÓ para os testes automáticos
     jwt-secret: chave-de-teste-com-mais-de-32-caracteres-0123456789
     admin-email: admin@teste.local
     admin-password: senha-admin-teste
   thingspeak:
     read-api-key:
     simulate: true
-  # sem carga em segundo plano: cada teste busca o que precisa (resultado previsível)
   warm-up: false
   devices:
     - id: IOT-001
@@ -138,14 +131,12 @@ ecosense:
       harvesting-type: Cinético
       channel-id: 1000010
 
-  # Baterias/armazenamento do sistema (opcional). field = percentual de carga.
   storage:
     - { name: Bateria 01, type: Íon-lítio, capacity-kwh: 5, channel-id: 2000001, field: field1 }
     - { name: Bateria 02, type: Íon-lítio, capacity-kwh: 3, channel-id: 2000002, field: field1 }
     - { name: Supercapacitor A, type: Supercapacitor, capacity-kwh: 0.5, channel-id: 2000003, field: field1 }
     - { name: Bateria 03, type: LiFePO4, capacity-kwh: 1.5, channel-id: 2000004, field: field1 }
 
-# Comportamento de cada canal simulado (bateria %, tendência %/dia, consumo W, coleta W, °C, offline)
 test-sim:
   channels:
     1000001: { battery: 87, trend-per-day: 0.3, consumption-w: 0.5, harvested-w: 0.62, temperature: 24 }
@@ -153,12 +144,10 @@ test-sim:
     1000003: { battery: 9, trend-per-day: -4, consumption-w: 0.38, harvested-w: 0.17, temperature: 31 }
     1000004: { battery: 92, trend-per-day: 0.1, consumption-w: 2.0, harvested-w: 2.17, temperature: 36 }
     1000005: { battery: 61, trend-per-day: -12, consumption-w: 3.08, temperature: 29 }
-    # 1000006: sistema solar (escala de W/kWh), mil vezes maior que os sensores
     1000006: { battery: 78, trend-per-day: 0.3, consumption-w: 920, harvested-w: 1040, temperature: 18 }
     1000007: { battery: 3, trend-per-day: -5, consumption-w: 4, harvested-w: 0.5, temperature: 26, offline-minutes: 180 }
     1000008: { battery: 18, trend-per-day: -3, consumption-w: 0.25, harvested-w: 0.12, temperature: 21 }
     1000009: { battery: 2, trend-per-day: -2, consumption-w: 0.25, harvested-w: 0.05, temperature: 20, offline-minutes: 1440 }
-    # 1000010: bateria subindo, mas coleta < consumo → saldo negativo (deficit)
     1000010: { battery: 66, trend-per-day: 0.5, consumption-w: 0.58, harvested-w: 0.4, temperature: 17 }
     2000001: { battery: 82 }
     2000002: { battery: 34 }

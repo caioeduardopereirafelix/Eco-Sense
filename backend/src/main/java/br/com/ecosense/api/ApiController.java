@@ -38,7 +38,6 @@ import br.com.ecosense.service.ForecastService;
 import br.com.ecosense.service.HistoryService;
 import br.com.ecosense.service.MaintenanceService;
 
-/** Endpoints descritos em docs/API.md. Cada um corresponde a um método de js/services/api.js. */
 @RestController
 @RequestMapping("/api")
 public class ApiController {
@@ -58,7 +57,6 @@ public class ApiController {
         this.maintenance = maintenance;
     }
 
-    /** group: todos (padrão) | iot | sistemas — ver DeviceGroup. */
     @GetMapping("/overview")
     public Overview overview(@RequestParam(required = false) String group) {
         return energy.overview(DeviceGroup.parse(group));

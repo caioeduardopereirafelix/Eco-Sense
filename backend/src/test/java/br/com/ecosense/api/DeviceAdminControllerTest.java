@@ -17,14 +17,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.context.WebApplicationContext;
 
-/** Cadastro de dispositivos no banco (H2 em memória, modo simulado). */
 @SpringBootTest
 @ActiveProfiles("test")
 class DeviceAdminControllerTest {
 
     @Autowired
     WebApplicationContext ctx;
-    /* todas as requisições vão com o token do administrador */
     MockMvc mvc;
 
     @BeforeEach
@@ -44,7 +42,7 @@ class DeviceAdminControllerTest {
         mvc.perform(post("/api/devices").contentType(MediaType.APPLICATION_JSON).content(NEW_DEVICE))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("TEST-01"))
-                .andExpect(jsonPath("$.status").value("Online"));    // canal simulado 1000001
+                .andExpect(jsonPath("$.status").value("Online"));
         mvc.perform(get("/api/devices")).andExpect(jsonPath("$", hasSize(11)));
         mvc.perform(get("/api/devices/TEST-01/settings"))
                 .andExpect(jsonPath("$.fields.temperature").value("none"))

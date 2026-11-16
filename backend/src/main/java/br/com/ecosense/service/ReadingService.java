@@ -31,23 +31,10 @@ import br.com.ecosense.config.EcoSenseProperties.StorageConfig;
 import br.com.ecosense.thingspeak.Feed;
 import br.com.ecosense.thingspeak.ThingSpeakClient;
 
-/**
- * Busca e guarda em cache as leituras dos canais do ThingSpeak.
- * Por dispositivo são 2 chamadas: a última entrada (estado atual) e as médias por hora dos
- * últimos {@value #HISTORY_DAYS} dias (histórico, tendência e previsão).
- * Se o ThingSpeak falhar, usa o último resultado em cache (ou nenhum dado) em vez de derrubar a API.
- *
- * Desempenho na primeira carga (até ~16 pedidos por canal):
- * - os pedidos ao ThingSpeak rodam em paralelo, no máximo {@value #MAX_PARALLEL_REQUESTS} ao mesmo tempo;
- * - cada dispositivo é buscado por uma requisição de cada vez: quem chega enquanto a busca está em
- *   andamento espera e usa o mesmo resultado, em vez de repetir os pedidos;
- * - {@link #warmUp} carrega tudo assim que o back-end liga ({@link ReadingWarmUp}).
- */
 @Service
 public class ReadingService {
 
     public static final int HISTORY_DAYS = 31;
-    /** pedidos simultâneos ao ThingSpeak (serviço gratuito: sem exagerar) */
     static final int MAX_PARALLEL_REQUESTS = 6;
     private static final Logger log = LoggerFactory.getLogger(ReadingService.class);
 
@@ -56,14 +43,8 @@ public class ReadingService {
     private final Clock clock;
     private final Map<String, Cached<DeviceData>> deviceCache = new ConcurrentHashMap<>();
     private final Map<String, Cached<Double>> storageCache = new ConcurrentHashMap<>();
-    /** médias horárias já baixadas, por dispositivo (para a busca incremental) */
     private final Map<String, List<Reading>> hourlyStore = new ConcurrentHashMap<>();
-    /** uma busca por dispositivo (ou bateria) de cada vez */
     private final Map<String, ReentrantLock> locks = new ConcurrentHashMap<>();
-    /**
-     * Executa SÓ os pedidos ao ThingSpeak (tarefas que não criam outras tarefas): o tamanho fixo limita os
-     * pedidos simultâneos sem risco de uma tarefa ficar esperando outra na fila.
-     */
     private final ExecutorService requests = Executors.newFixedThreadPool(MAX_PARALLEL_REQUESTS, daemonThreads());
 
     public ReadingService(ThingSpeakClient client, EcoSenseProperties props, Clock clock) {
@@ -73,7 +54,6 @@ public class ReadingService {
         logStartup();
     }
 
-    /** Diz no log de onde vêm os dados e se a Read API Key foi encontrada (sem mostrar a chave). */
     private void logStartup() {
         if (props.thingspeak().simulate()) {
             log.info("Modo simulado: leituras geradas localmente; o ThingSpeak não é chamado.");
@@ -100,10 +80,6 @@ public class ReadingService {
         requests.shutdownNow();
     }
 
-    /**
-     * Carrega as leituras de todos os dispositivos e baterias do sistema, em paralelo, e espera terminar.
-     * Usado ao ligar o back-end, para a primeira tela já encontrar os dados em cache.
-     */
     public void warmUp(List<DeviceConfig> devices) {
         List<Thread> tasks = new ArrayList<>();
         for (DeviceConfig d : devices) tasks.add(Thread.ofVirtual().start(() -> data(d)));
@@ -118,9 +94,7 @@ public class ReadingService {
         }
     }
 
-    /** Descarta as leituras guardadas de um dispositivo (após editar o canal ou removê-lo). */
     public void evict(String deviceId) {
-        /* espera uma busca em andamento terminar, para ela não gravar de volta dados do canal antigo */
         ReentrantLock lock = lockFor(deviceId);
         lock.lock();
         try {
@@ -139,7 +113,6 @@ public class ReadingService {
         return cached != null && cached.fetchedAt().plus(props.cacheTtl()).isAfter(now);
     }
 
-    /** latest = última entrada (null se o canal nunca transmitiu); hourly = médias por hora, em ordem. */
     public record DeviceData(Reading latest, List<Reading> hourly) {
         static final DeviceData EMPTY = new DeviceData(null, List.of());
     }
@@ -153,7 +126,6 @@ public class ReadingService {
         ReentrantLock lock = lockFor(d.id());
         lock.lock();
         try {
-            /* outra requisição pode ter acabado de buscar enquanto esta esperava */
             Instant now = clock.instant();
             cached = deviceCache.get(d.id());
             if (fresh(cached, now)) return cached.value();
@@ -176,20 +148,12 @@ public class ReadingService {
             return data;
         } catch (RuntimeException e) {
             warnFailure(d.channelId(), d.id(), e);
-            /* guarda também a falha: evita repetir a chamada a cada requisição até o cache vencer */
             DeviceData fallback = cached != null ? cached.value() : DeviceData.EMPTY;
             deviceCache.put(d.id(), new Cached<>(now, fallback));
             return fallback;
         }
     }
 
-    /**
-     * Médias horárias dos últimos {@value #HISTORY_DAYS} dias.
-     * O ThingSpeak lê no máximo 8000 entradas por requisição ANTES de calcular as médias; em canais que
-     * enviam a cada poucos segundos isso cobre só alguns dias. Por isso:
-     * - na primeira vez, busca em pedaços de {@code history-chunk-days} dias;
-     * - nas seguintes, busca só as últimas horas e junta ao que já tinha (incremental).
-     */
     private List<Reading> hourly(DeviceConfig d, String key, Instant now) {
         Instant from = now.minus(Duration.ofDays(HISTORY_DAYS));
         List<Reading> stored = hourlyStore.getOrDefault(d.id(), List.of());
@@ -198,13 +162,11 @@ public class ReadingService {
         if (stored.isEmpty()) {
             fetchFrom = from;
         } else {
-            /* refaz as 2 últimas horas (a hora corrente ainda está mudando) */
             fetchFrom = stored.get(stored.size() - 1).at().truncatedTo(ChronoUnit.HOURS).minus(Duration.ofHours(1));
             for (Reading r : stored) {
                 if (!r.at().isBefore(from) && r.at().isBefore(fetchFrom)) byHour.put(hourOf(r), r);
             }
         }
-        /* os pedaços são independentes: busca em paralelo e junta por hora (a ordem não importa) */
         Duration chunk = Duration.ofDays(d.historyChunkDays());
         List<Future<List<Feed>>> parts = new ArrayList<>();
         for (Instant start = fetchFrom; start.isBefore(now); start = start.plus(chunk)) {
@@ -219,7 +181,7 @@ public class ReadingService {
                 }
             }
         } catch (RuntimeException e) {
-            parts.forEach(p -> p.cancel(true)); // um pedaço falhou: não adianta esperar os outros
+            parts.forEach(p -> p.cancel(true));
             throw e;
         }
         List<Reading> merged = List.copyOf(byHour.values());
@@ -227,7 +189,6 @@ public class ReadingService {
         return merged;
     }
 
-    /** Espera o resultado de um pedido; a falha volta como a exceção original (tratada em {@link #data}). */
     private static <T> T await(Future<T> future) {
         try {
             return future.get();
@@ -248,7 +209,6 @@ public class ReadingService {
         return r.at().truncatedTo(ChronoUnit.HOURS);
     }
 
-    /** O ThingSpeak responde "-1" quando o canal é privado e a Read API Key está ausente ou errada. */
     private static void warnFailure(Long channelId, String name, RuntimeException e) {
         String message = String.valueOf(e.getMessage());
         String hint = message.contains("\"-1\"")
@@ -257,7 +217,6 @@ public class ReadingService {
         log.warn("Falha ao ler o canal {} ({}) no ThingSpeak: {}{}", channelId, name, message, hint);
     }
 
-    /** Percentual de carga de uma bateria do sistema (null se indisponível). */
     public Double storagePct(StorageConfig s) {
         Cached<Double> cached = storageCache.get(s.name());
         if (fresh(cached, clock.instant())) return cached.value();
@@ -292,7 +251,6 @@ public class ReadingService {
         return specific != null && !specific.isBlank() ? specific : props.thingspeak().readApiKey();
     }
 
-    /** Lê os fields mapeados e converte para as unidades do EcoSense (%, W, °C). */
     static Reading toReading(Feed f, Fields m, Conversion c) {
         return new Reading(f.createdAt(),
                 c.battery(f.number(m.battery())),

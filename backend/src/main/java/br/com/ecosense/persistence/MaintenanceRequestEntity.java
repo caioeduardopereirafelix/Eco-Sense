@@ -10,7 +10,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Solicitação de manutenção (tabela {@code maintenance_requests}). */
 @Entity
 @Table(name = "maintenance_requests")
 public class MaintenanceRequestEntity {
@@ -29,7 +28,6 @@ public class MaintenanceRequestEntity {
     @Column(nullable = false)
     private Instant createdAt;
     private LocalDate scheduledFor;
-    /** quem pediu (null em pedidos anteriores ao login) */
     private Long requestedById;
     @Column(length = 80)
     private String requestedByName;
