@@ -1,0 +1,5 @@
+.git
+.claude
+backend/target
+backend/.env
+**/.env

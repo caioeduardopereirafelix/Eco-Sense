@@ -5,6 +5,7 @@ import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -27,5 +28,11 @@ public class AppConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(props.corsOrigins().toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+    }
+
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addRedirectViewController("/admin", "/admin/");
+        registry.addViewController("/admin/").setViewName("forward:/admin/index.html");
     }
 }
