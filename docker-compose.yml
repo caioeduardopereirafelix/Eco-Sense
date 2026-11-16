@@ -1,0 +1,35 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no arquivo .env}
+      MYSQL_DATABASE: ecosense
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      MYSQL_URL: jdbc:mysql://mysql:3306/ecosense?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      ECOSENSE_ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ecosense.local}
+      ECOSENSE_ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD no arquivo .env}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no arquivo .env}
+      THINGSPEAK_READ_API_KEY: ${THINGSPEAK_READ_API_KEY:-}
+    ports:
+      - "80:8080"
+
+volumes:
+  mysql-data:
