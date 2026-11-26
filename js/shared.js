@@ -36,8 +36,8 @@ const cleanups=[],onLeave=f=>cleanups.push(f);
 let viewState={};
 const pageState=defaults=>{for(const k in defaults)if(!(k in viewState))viewState[k]=defaults[k];return viewState};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-function chart(id,type,L,sets,extra={},plugins=[]){const c=new Chart(document.getElementById(id),{type,plugins,data:{labels:L,datasets:sets.map(s=>({tension:.35,pointRadius:0,borderWidth:2,fill:type==='line'&&s.fill,...s}))},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:css('--mu'),boxWidth:12}}},scales:{x:{ticks:{color:css('--mu'),maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:css('--mu')},grid:{color:css('--bd')},...extra}}}});charts.push(c)}
-const lineDataset=(c,l,d)=>({borderColor:css(c),backgroundColor:css(c)+'22',label:l,data:d,fill:true});
+function chart(id,type,L,sets,extra={},plugins=[]){const c=new Chart(document.getElementById(id),{type,plugins,data:{labels:L,datasets:sets.map(s=>({tension:.35,pointRadius:0,borderWidth:3,fill:type==='line'&&s.fill,...s}))},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:css('--mu'),boxWidth:12}}},scales:{x:{ticks:{color:css('--mu'),maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:css('--mu')},grid:{color:css('--bd')},...extra}}}});charts.push(c)}
+const lineDataset=(c,l,d)=>({borderColor:css(c),backgroundColor:css(c)+'38',label:l,data:d,fill:true});
 const rtf=new Intl.RelativeTimeFormat('pt-BR',{numeric:'auto'});
 function timeAgo(iso){
  const t=Date.parse(iso);if(Number.isNaN(t))return'—';
