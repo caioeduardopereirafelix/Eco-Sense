@@ -1,5 +1,5 @@
 (()=>{
- try{document.documentElement.dataset.theme=localStorage.getItem('eh-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){document.documentElement.dataset.theme='dark'}
+ try{document.documentElement.dataset.theme=localStorage.getItem('eh-theme')||'light'}catch(e){document.documentElement.dataset.theme='light'}
  const next=auth.safeNext(new URLSearchParams(location.search).get('next')||'');
  const target=s=>next&&next.includes('/admin/')===auth.isAdmin(s)?next:auth.home(s);
  const current=auth.get();

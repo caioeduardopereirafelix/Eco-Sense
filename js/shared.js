@@ -149,6 +149,6 @@ function startApp(NAV,pages,{staticPages=[],role}={}){
  rerender=()=>go(true);
  $('#menu').onclick=()=>$('#side').classList.toggle('open');
  function setTheme(t){document.documentElement.dataset.theme=t;try{localStorage.setItem('eh-theme',t)}catch(e){}}
- let t0='dark';try{t0=localStorage.getItem('eh-theme')||(matchMedia('(prefers-color-scheme: light)').matches?'light':'dark')}catch(e){}
+ let t0='light';try{t0=localStorage.getItem('eh-theme')||'light'}catch(e){}
  setTheme(t0);$('#theme').onclick=()=>{setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');go()};
  go()}
