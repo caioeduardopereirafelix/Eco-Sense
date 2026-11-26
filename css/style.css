@@ -1,6 +1,6 @@
-:root{--bg:#0b1d22;--sf:#12292f;--sf2:#183840;--bd:#245058;--tx:#e6f4f1;--mu:#8fb0ab;--gen:#c8f04a;--con:#4fd1e8;--sto:#f5b942;--ok:#4ade80;--wn:#f5b942;--cr:#ff6b5e;--hi:#ff9d4d;
+:root{--bg:#07141a;--sf:#16323a;--sf2:#21474f;--bd:#4f8a93;--tx:#ffffff;--mu:#cfe3df;--gen:#d6f75c;--on-gen:#0a1c10;--con:#62b8ff;--sto:#ffc54d;--ok:#5be38f;--wn:#ffc54d;--cr:#ff7a6e;--hi:#ffaa5c;--shadow:0 1px 2px rgba(0,0,0,.35),0 4px 14px rgba(0,0,0,.25);--hover:#2a5761;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-:root[data-theme=light]{--bg:#eef5f3;--sf:#fff;--sf2:#e2eeeb;--bd:#c3d8d3;--tx:#0e2a2f;--mu:#52726d;--gen:#6c8f00;--con:#0a8aa3;--sto:#b77d00;--ok:#16a34a;--wn:#b77d00;--cr:#d6402f;--hi:#d9731a}
+:root[data-theme=light]{--bg:#f4f7f6;--sf:#ffffff;--sf2:#e4ece9;--bd:#8eaaa3;--tx:#081a1e;--mu:#2a443f;--gen:#2f7a00;--on-gen:#ffffff;--con:#0b5cad;--sto:#a86200;--ok:#11742c;--wn:#a86200;--cr:#bd2417;--hi:#b94f00;--shadow:0 1px 2px rgba(8,26,30,.08),0 3px 10px rgba(8,26,30,.07);--hover:#d5e2de;color-scheme:light}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box;margin:0}
 body{background:var(--bg);color:var(--tx);font:15px/1.5 'IBM Plex Sans',system-ui,sans-serif;display:flex;min-height:100vh}
@@ -48,7 +48,7 @@ th{color:var(--mu);font-weight:500}
 .tw{overflow-x:auto}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
 .btn{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:7px 14px}
-.btn.on{background:var(--gen);color:#0b1d22;border-color:var(--gen);font-weight:500}
+.btn.on{background:var(--gen);color:var(--on-gen);border-color:var(--gen);font-weight:500}
 .alert{display:flex;gap:12px;padding:12px 14px;border-radius:10px;background:var(--sf2);border-left:4px solid;margin-bottom:10px}
 .alert.read{opacity:.5}
 .alert div{flex:1}
@@ -58,7 +58,7 @@ th{color:var(--mu);font-weight:500}
 .set{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--bd)}
 .sw{width:42px;height:24px;border-radius:99px;background:var(--sf2);border:1px solid var(--bd);position:relative;padding:0}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--mu);transition:.2s}
-.sw.on{background:var(--gen)}.sw.on::after{left:20px;background:#0b1d22}
+.sw.on{background:var(--gen)}.sw.on::after{left:20px;background:var(--on-gen)}
 .banner{background:var(--sf2);border:1px solid var(--gen);border-radius:10px;padding:10px 14px;margin-bottom:16px}
 .maintenance-map{height:390px;border:1px solid var(--bd);border-radius:10px;z-index:0;background:var(--sf2)}
 .maintenance-map .leaflet-bar a,.maintenance-map .leaflet-bar a:hover{color:#0e2a2f}
@@ -95,3 +95,26 @@ body.login-page{display:block}
 .login-card .btn{min-height:40px;margin-top:4px;justify-content:center}
 .login-title{font-family:'Bricolage Grotesque';font-size:24px;margin:4px 0 0}
 .login-err{color:var(--cr);min-height:20px;font-size:13px}
+
+:root{color-scheme:dark}
+body{-webkit-font-smoothing:antialiased}
+.big,td,.kv dd{font-variant-numeric:tabular-nums}
+.card{box-shadow:var(--shadow)}
+.card h3{font-weight:600;letter-spacing:.01em}
+.tag{font-weight:600}
+th{font-weight:600}
+aside a{font-weight:500;transition:background .15s,color .15s}
+aside a.on{font-weight:600}
+.btn{font-weight:500;transition:transform .12s,background .15s,border-color .15s,box-shadow .15s}
+.btn:hover:not(:disabled){background:var(--hover);border-color:var(--mu);transform:translateY(-1px)}
+.btn.on:hover:not(:disabled){background:var(--gen);filter:brightness(1.08)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.98)}
+.pill{transition:background .15s,border-color .15s}
+button.pill:hover{background:var(--hover);border-color:var(--mu)}
+tbody tr{transition:background .12s}
+tbody tr:hover{background:var(--sf2)}
+.alert{box-shadow:var(--shadow)}
+:focus-visible{outline:3px solid var(--con);outline-offset:2px;border-radius:4px}
+input:focus,select:focus,textarea:focus{border-color:var(--con);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--con) 30%,transparent)}
+:root[data-theme=light] .map-dark .leaflet-tile-pane{filter:none}
+@media(prefers-reduced-motion:reduce){.btn,.btn:hover,.btn:active{transform:none}}

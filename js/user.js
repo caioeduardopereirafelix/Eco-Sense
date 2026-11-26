@@ -23,8 +23,11 @@ async inicio(){
  const [o,alerts,devices,fc,h]=await Promise.all([api.getOverview(group),userAlerts(),api.getDevices(),api.getForecasts(),api.getHistory('hoje',{group})]);
  const fById=byId(fc.items);
  const needs=devices.filter(d=>needsAttention(d,fById[d.id]));
+ const off=needs.filter(d=>d.status==='Offline').length,low=needs.filter(d=>d.status!=='Offline'&&d.battery<20).length,soon=needs.length-off-low;
+ const why=[off&&`${off} offline`,low&&`${low} com bateria baixa`,soon&&`${soon} com bateria acabando em até 7 dias`].filter(Boolean);
+ const whyText=why.length>1?`${why.slice(0,-1).join(', ')} e ${why.at(-1)}`:why[0];
  const banner=needs.length
-  ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção. <a href="#dispositivos">Ver meus dispositivos</a></div>`
+  ?`<div class="banner" style="border-color:var(--wn)">${needs.length} ${needs.length===1?'dispositivo precisa':'dispositivos precisam'} de atenção: ${whyText}. <a href="#dispositivos">Ver meus dispositivos</a></div>`
   :'<div class="banner" style="border-color:var(--ok)">Tudo certo com os seus dispositivos.</div>';
  V.innerHTML=`${banner}<div class="grid">
   <div class="card"><h3>Energia gerada hoje</h3><div class="big">${bigKwh(o.generation.todayKwh)}</div>${changeText(o.generation.changePct,true)}</div>
