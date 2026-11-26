@@ -7,27 +7,26 @@ async dashboard(){const[o,a,h]=await Promise.all([api.getOverview(group),api.get
  <div class="card"><h3>Dispositivos</h3><div class="big">${num(o.devices.total)}</div><div class="mu"><span class="s-Online">● ${num(o.devices.online)} online</span> · <span class="s-Offline">● ${num(o.devices.offline)} offline</span></div></div></div>
  <div class="grid g2"><div class="card"><h3>Gerada × consumida hoje (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>
  <div class="card"><h3>Nível de armazenamento hoje (%)</h3><div class="chart"><canvas id="c2"></canvas></div></div></div>
- <div class="card"><h3>Alertas recentes</h3><div id="recent"></div></div>`;
+ <div class="card"><h3>Alertas recentes</h3><div id="recent"></div><a class="mu" href="#manutencao">Ver todos os alertas e pedidos</a></div>`;
  V.prepend(groupFilter());
  const drawAlerts=()=>{$('#recent').innerHTML=a.length?withRead(a).slice(0,3).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
  V.onclick=e=>{const b=e.target.closest('[data-read]');if(b){readIds.add(b.dataset.read);drawAlerts()}};
  drawAlerts();
  chart('c1','line',historyLabels(h),[lineDataset('--gen','Gerada',historyEnergy(h).gen),lineDataset('--con','Consumida',historyEnergy(h).con)]);
  chart('c2','line',historyLabels(h),[lineDataset('--sto','Armazenada',h.storagePct)],{min:0,max:100})},
-async geracao(){const[s,h]=await Promise.all([api.getSources(group),api.getHistory('7d',{group})]);
- V.innerHTML=`<div class="grid">${s.map(x=>sourceCard(x,{showUpdated:true})).join('')}</div>
+async energia(){const[s,l,b]=await Promise.all([api.getSources(group),api.getLoads(),api.getBatteries()]);
+ V.innerHTML=`<h2 class="sec">De onde vem a energia</h2>
+ <div class="grid">${s.map(x=>sourceCard(x,{showUpdated:true})).join('')}</div>
  ${shareCard(s)}
- <div class="card"><h3>Geração ao longo da semana (${historyEnergy(h).unit})</h3><div class="chart"><canvas id="c1"></canvas></div></div>`;
- V.prepend(groupFilter());
- chart('c1','line',historyLabels(h),[lineDataset('--gen','Total gerado',historyEnergy(h).gen)])},
-async consumo(){const l=await api.getLoads();
- V.innerHTML=`<div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
- ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(x.currentW)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`).join('')}</table></div></div>`).join('')}`},
-async armazenamento(){const b=await api.getBatteries();
- V.innerHTML=`<div class="grid g2">${b.map(batteryCard).join('')}</div>`},
+ <h2 class="sec">Consumo</h2>
+ <div class="card" style="margin-bottom:16px"><h3>Maiores consumidores agora</h3>${topConsumers(l)}</div>
+ ${['Alta','Média','Baixa'].map(p=>`<div class="card" style="margin-bottom:16px"><h3>Prioridade ${p.toLowerCase()}</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Atual</th><th>Média</th><th>Status</th></tr>${l.filter(x=>x.priority===p).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${power(x.currentW)}</td><td>${power(x.avgW)}</td><td>${tag(x.status)}</td></tr>`).join('')}</table></div></div>`).join('')}
+ <h2 class="sec">Armazenamento</h2>
+ <div class="grid g2">${b.map(batteryCard).join('')}</div>`;
+ V.prepend(groupFilter())},
 async manutencao(){
- let requests,devices,fc;
- try{[requests,devices,fc]=await Promise.all([api.getMaintenanceRequests(),api.getDevices(),api.getForecasts()])}
+ let requests,devices,fc,alerts;
+ try{[requests,devices,fc,alerts]=await Promise.all([api.getMaintenanceRequests(),api.getDevices(),api.getForecasts(),api.getAlerts()])}
  catch(error){V.innerHTML=`<div class="banner" role="alert">Não foi possível carregar as solicitações de manutenção: ${esc(error.message)}</div>`;return}
  const deviceById=byId(devices),forecastById=byId(fc.items),statuses=MAINTENANCE_STATUSES;
  const offsetDate=days=>{const d=new Date();d.setDate(d.getDate()+days);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -83,6 +82,7 @@ async manutencao(){
     <div class="card"><h3>Visitas nas próximas 3 semanas</h3><div class="big">${upcomingCount}</div><div class="mu">${formatDay(today)} a ${formatDay(lastUpcomingDay)}</div></div>
     <div class="card"><h3>Dispositivos em risco</h3><div class="big">${devices.filter(d=>riskOf(d).className!=='low').length}</div><div class="mu">Priorize os pontos críticos no mapa</div></div>
    </div>
+   <div class="card" style="margin-bottom:16px"><h2 class="sec">Alertas</h2><div id="mt-alerts"></div></div>
    <div class="card" style="margin-bottom:16px">
     <h2 class="sec">Mapa de dispositivos por risco</h2>
     <div id="maintenance-map" class="maintenance-map" role="img" aria-label="Mapa dos dispositivos coloridos conforme o risco"></div>
@@ -92,6 +92,8 @@ async manutencao(){
    <h2 class="sec">Solicitações por região</h2>
    <div id="maintenance-filters"></div>
    ${Object.keys(groups).length?Object.keys(groups).sort((a,b)=>a.localeCompare(b,'pt-BR')).map(region=>`<section><h3 class="sec">${esc(region)} <span class="mu">(${groups[region].length})</span></h3>${groups[region].map(requestCard).join('')}</section>`).join(''):`<div class="card mu">Nenhuma solicitação neste filtro.</div>`}`;
+  const drawAlerts=()=>{$('#mt-alerts').innerHTML=alerts.length?withRead(alerts).map(alertHTML).join(''):'<div class="mu">Nenhum alerta no momento.</div>'};
+  drawAlerts();
   const filterHost=$('#maintenance-filters');
   filterHost.append(filters([['abertas','Em aberto'],['proximas','Próximas 3 semanas'],['concluidas','Concluídas'],['todas','Todas']],scope,k=>{st.scope=k;draw()}));
   const mapNote=$('#map-note');
@@ -121,6 +123,7 @@ async manutencao(){
    if(points.length<devices.length)mapNote.textContent=`${devices.length-points.length} dispositivo(s) sem coordenadas não aparecem no mapa.`
   }
   V.onclick=async e=>{
+   const read=e.target.closest('[data-read]');if(read){readIds.add(read.dataset.read);drawAlerts();return}
    const button=e.target.closest('[data-save]');if(!button)return;
    const id=button.dataset.save,card=button.closest('.request-card'),statusField=card.querySelector('[data-status]'),dateField=card.querySelector('[data-date]');
    button.disabled=true;
@@ -278,10 +281,6 @@ async dispositivos(notice=''){
  draw(current)},
 previsao:()=>renderForecast({detailed:true}),
 historico:()=>renderHistory({custom:true,storageTitle:'Energia armazenada'}),
-async alertas(){const a=await api.getAlerts();
- const draw=()=>{V.innerHTML=a.length?withRead(a).map(alertHTML).join(''):'<div class="card mu">Nenhum alerta no momento.</div>'};
- V.onclick=e=>{const b=e.target.closest('[data-read]');if(b){readIds.add(b.dataset.read);draw()}};
- draw()},
 async usuarios(notice=''){
  const users=await api.getUsers();
  const meId=auth.get().user.id;
@@ -360,10 +359,10 @@ Ele perde o acesso imediatamente.`))return;
  };
  onLeave(()=>{if(V.onsubmit===submit)V.onsubmit=null});
  draw()},
-async configuracoes(){
+async conta(){
  const me=await api.getMe();
  V.innerHTML=accountCards(me);
  bindAccount()}
 };
-const NAV=[['dashboard','Dashboard'],['geracao','Geração de Energia'],['consumo','Consumo'],['armazenamento','Armazenamento'],['dispositivos','Dispositivos IoT'],['manutencao','Manutenção'],['previsao','Previsão'],['historico','Histórico'],['alertas','Alertas'],['usuarios','Usuários'],['configuracoes','Configurações']];
-startApp(NAV,pages,{staticPages:['configuracoes'],role:'ADMIN'});
+const NAV=[['dashboard','Dashboard'],['dispositivos','Dispositivos'],['energia','Energia'],['previsao','Previsão'],['historico','Histórico'],['manutencao','Alertas e manutenção'],['usuarios','Usuários']];
+startApp(NAV,pages,{staticPages:['conta'],role:'ADMIN'});

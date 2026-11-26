@@ -115,7 +115,7 @@ function startApp(NAV,pages,{staticPages=[],role}={}){
    charts.forEach(c=>c.destroy());charts=[];V.onclick=null;
    runAll(cleanups.splice(0));
    document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.k===k));
-   $('#title').textContent=NAV.find(n=>n[0]===k)[1];$('#side').classList.remove('open');
+   {const n=NAV.find(n=>n[0]===k);$('#title').textContent=n?n[1]:'Minha conta'}$('#side').classList.remove('open');
    V.innerHTML='<div class="mu" role="status">Carregando…</div>';
   }
   loading=true;
