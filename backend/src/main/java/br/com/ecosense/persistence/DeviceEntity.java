@@ -53,6 +53,9 @@ public class DeviceEntity {
     private Integer position;
     private Instant createdAt;
     private Instant updatedAt;
+    @Column(columnDefinition = "boolean not null default true")
+    private boolean active = true;
+    private Instant deactivatedAt;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -104,4 +107,8 @@ public class DeviceEntity {
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public boolean isActive() { return active; }
+    public void setActive(boolean active) { this.active = active; }
+    public Instant getDeactivatedAt() { return deactivatedAt; }
+    public void setDeactivatedAt(Instant deactivatedAt) { this.deactivatedAt = deactivatedAt; }
 }

@@ -126,4 +126,6 @@ public final class ApiDtos {
 
     public record ChannelInfo(long channelId, String name, String description, Double latitude, Double longitude,
                               java.util.Map<String, String> fields, Instant lastEntryAt) {}
+
+    public record InactiveDevice(String id, String name, String location, java.time.Instant deactivatedAt) {}
 }

@@ -56,8 +56,11 @@ public class DeviceCatalog {
     @Transactional
     public synchronized DeviceConfig create(DeviceSettings s) {
         if (s.id() == null || s.id().isBlank()) throw ApiException.badRequest("Informe o ID do dispositivo.");
-        if (repository.existsById(s.id()))
-            throw new ApiException(HttpStatus.CONFLICT, "Já existe um dispositivo com o ID " + s.id() + ".");
+        Optional<DeviceEntity> existing = repository.findById(s.id());
+        if (existing.isPresent())
+            throw new ApiException(HttpStatus.CONFLICT, existing.get().isActive()
+                    ? "Já existe um dispositivo com o ID " + s.id() + "."
+                    : "Já existe um dispositivo desativado com o ID " + s.id() + ". Reative-o na lista de desativados.");
         requireChannel(s);
         DeviceEntity e = new DeviceEntity();
         e.setId(s.id());
@@ -74,6 +77,7 @@ public class DeviceCatalog {
         if (s.id() != null && !s.id().isBlank() && !s.id().equals(id))
             throw ApiException.badRequest("O ID do dispositivo não pode ser alterado.");
         DeviceEntity e = entity(id);
+        if (!e.isActive()) throw ApiException.badRequest("Reative o dispositivo antes de editá-lo.");
         requireChannel(s);
         apply(s, e);
         repository.save(e);
@@ -83,15 +87,34 @@ public class DeviceCatalog {
     }
 
     @Transactional
-    public synchronized void delete(String id) {
-        repository.delete(entity(id));
+    public synchronized void deactivate(String id) {
+        DeviceEntity e = entity(id);
+        if (!e.isActive()) return;
+        e.setActive(false);
+        e.setDeactivatedAt(clock.instant());
+        repository.save(e);
         readings.evict(id);
         reload();
     }
 
+    @Transactional
+    public synchronized DeviceConfig reactivate(String id) {
+        DeviceEntity e = entity(id);
+        e.setActive(true);
+        e.setDeactivatedAt(null);
+        e.setUpdatedAt(clock.instant());
+        repository.save(e);
+        reload();
+        return find(id).orElseThrow();
+    }
+
+    public List<DeviceEntity> inactive() {
+        return repository.findAllByActiveFalseOrderByDeactivatedAtDesc();
+    }
+
     private synchronized List<DeviceConfig> reload() {
         if (repository.count() == 0 && !props.devices().isEmpty()) seed();
-        cache = repository.findAllByOrderByPositionAscIdAsc().stream().map(DeviceCatalog::toConfig).toList();
+        cache = repository.findAllByActiveTrueOrderByPositionAscIdAsc().stream().map(DeviceCatalog::toConfig).toList();
         return cache;
     }
 

@@ -60,6 +60,16 @@ class DeviceAdminControllerTest {
         mvc.perform(delete("/api/devices/TEST-01")).andExpect(status().isNoContent());
         mvc.perform(get("/api/devices/TEST-01")).andExpect(status().isNotFound());
         mvc.perform(get("/api/devices")).andExpect(jsonPath("$", hasSize(10)));
+
+        mvc.perform(get("/api/devices/inactive")).andExpect(jsonPath("$[0].id").value("TEST-01"));
+        mvc.perform(post("/api/devices").contentType(MediaType.APPLICATION_JSON).content(NEW_DEVICE))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Já existe um dispositivo desativado com o ID TEST-01. Reative-o na lista de desativados."));
+        mvc.perform(post("/api/devices/TEST-01/reactivate")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Sensor renomeado"));
+        mvc.perform(get("/api/devices")).andExpect(jsonPath("$", hasSize(11)));
+        mvc.perform(delete("/api/devices/TEST-01")).andExpect(status().isNoContent());
+        mvc.perform(get("/api/devices/inactive")).andExpect(jsonPath("$", hasSize(1)));
     }
 
     @Test
@@ -73,7 +83,7 @@ class DeviceAdminControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Field inválido (use field1 a field8 ou none)."));
         mvc.perform(post("/api/devices").contentType(MediaType.APPLICATION_JSON)
-                        .content(NEW_DEVICE.replace("\"batteryVoltageMax\":4.2", "\"batteryVoltageMax\":2.0")))
+                        .content(NEW_DEVICE.replace("\"batteryVoltageMax\":4.2", "\"batteryVoltageMax\":2.0").replace("\"TEST-01\"", "\"TEST-02\"")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("A tensão de bateria cheia deve ser maior que a de bateria vazia."));
         mvc.perform(put("/api/devices/IOT-001").contentType(MediaType.APPLICATION_JSON).content(NEW_DEVICE))

@@ -137,7 +137,7 @@ async manutencao(){
  draw()
 },
 async dispositivos(notice=''){
- const [devices,fc]=await Promise.all([api.getDevices(),api.getForecasts()]);
+ const [devices,fc,inactive]=await Promise.all([api.getDevices(),api.getForecasts(),api.getInactiveDevices()]);
  const fById=byId(fc.items);
  const st=pageState({filter:'all'});
  let current=st.filter,form=null;
@@ -164,7 +164,7 @@ async dispositivos(notice=''){
     ${kvRow('Temperatura',d.temperature==null?'—':`${num(d.temperature)} °C`)}
     ${kvRow('Transmissão',`a cada ${num(d.txInterval)} min`)}
    </dl>
-   <div class="card-actions"><button class="btn" data-edit="${esc(d.id)}">Editar</button><button class="btn danger" data-del="${esc(d.id)}">Remover</button></div>
+   <div class="card-actions"><button class="btn" data-edit="${esc(d.id)}">Editar</button><button class="btn danger" data-del="${esc(d.id)}">Desativar</button></div>
   </div>`;
  };
  const draw=k=>{
@@ -179,6 +179,7 @@ async dispositivos(notice=''){
    ?`<div class="grid">${list.map(card).join('')}</div>`
    :'<div class="card mu">Nenhum dispositivo neste filtro.</div>');
   if(form)$('#devform').scrollIntoView({block:'start'});
+  if(inactive.length)V.insertAdjacentHTML('beforeend',`<div class="card" style="margin-top:16px"><h3>Dispositivos desativados (${inactive.length})</h3><div class="tw"><table><tr><th>Dispositivo</th><th>Local</th><th>Desativado em</th><th></th></tr>${inactive.map(x=>`<tr><td>${esc(x.name)} <span class="mu">${esc(x.id)}</span></td><td>${esc(x.location||'—')}</td><td>${x.deactivatedAt?esc(new Date(x.deactivatedAt).toLocaleString('pt-BR')):'—'}</td><td style="text-align:right"><button class="btn" data-react="${esc(x.id)}">Reativar</button></td></tr>`).join('')}</table></div><div class="mu" style="margin-top:8px">Não aparecem nas telas nem são monitorados. O cadastro e os pedidos de manutenção continuam guardados.</div></div>`);
  };
 
  const FIELD_KEYS=[['battery','Bateria'],['consumption','Consumo'],['temperature','Temperatura'],['harvested','Energia coletada']];
@@ -239,7 +240,7 @@ async dispositivos(notice=''){
  };
 
  V.onclick=async e=>{
-  const t=e.target.closest('[data-new],[data-edit],[data-del],[data-cancel],[data-fetch]');if(!t)return;
+  const t=e.target.closest('[data-new],[data-edit],[data-del],[data-cancel],[data-fetch],[data-react]');if(!t)return;
   if(t.dataset.new){notice='';form={mode:'new',s:{priority:'Média',txInterval:5,fields:{battery:'field1',consumption:'field2',temperature:'field3',harvested:'field4'},conversion:{}}};draw(current)}
   else if(t.dataset.cancel){form=null;draw(current)}
   else if(t.dataset.edit){
@@ -249,9 +250,14 @@ async dispositivos(notice=''){
   }
   else if(t.dataset.del){
    const d=devices.find(x=>x.id===t.dataset.del);
-   if(!confirm(`Remover "${d.name}" (${d.id})?\n\nSó o cadastro é apagado; os dados continuam no ThingSpeak.`))return;
-   try{await api.deleteDevice(d.id);await pages.dispositivos(`Dispositivo ${d.name} removido.`)}
-   catch(err){notice=`Não foi possível remover: ${err.message}`;draw(current)}
+   if(!confirm(`Desativar "${d.name}" (${d.id})?\n\nEle sai das telas e deixa de ser monitorado. O cadastro e os pedidos de manutenção ficam guardados, e você pode reativá-lo depois.`))return;
+   try{await api.deleteDevice(d.id);await pages.dispositivos(`Dispositivo ${d.name} desativado. Ele aparece em "Dispositivos desativados", no fim da página.`)}
+   catch(err){notice=`Não foi possível desativar: ${err.message}`;draw(current)}
+  }
+  else if(t.dataset.react){
+   const d=inactive.find(x=>x.id===t.dataset.react);
+   try{await api.reactivateDevice(d.id);await pages.dispositivos(`Dispositivo ${d.name} reativado.`)}
+   catch(err){notice=`Não foi possível reativar: ${err.message}`;draw(current)}
   }
   else if(t.dataset.fetch){
    try{form.s=readForm()}catch(err){form.error=err.message;draw(current);return}
