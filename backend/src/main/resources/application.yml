@@ -45,8 +45,8 @@ ecosense:
 
   devices:
     - id: IOT-001
-      name: Harveo – coletor solar
-      location: Laboratório EMBEDO (indoor)
+      name: Agro Báltico · Sensor de estufa
+      location: Agro Báltico – Estufa 2
       region: Gdańsk
       latitude: 54.424526
       longitude: 18.478837
@@ -68,8 +68,8 @@ ecosense:
         harvested-scale: 0.001
 
     - id: IOT-002
-      name: EMBEDO Node – sensores
-      location: Laboratório EMBEDO (indoor)
+      name: Agro Báltico · Central de sensores
+      location: Agro Báltico – Galpão de controle
       region: Gdańsk
       latitude: 54.424526
       longitude: 18.478837
@@ -85,8 +85,8 @@ ecosense:
         harvested: none
 
     - id: IOT-003
-      name: Usina solar 12 V
-      location: Elektrownia solarna
+      name: EnerSol Polska · Estação solar 12 V
+      location: EnerSol Polska – Usina rural
       region: Polônia
       latitude: 49.625
       longitude: 20.695556
@@ -104,8 +104,8 @@ ecosense:
         harvested-scale: 12.8
 
     - id: IOT-004
-      name: Estação solar Yokohama
-      location: Solar Weather Station (Outside2-17)
+      name: Kanagawa Logística · Estação de clima
+      location: Kanagawa Logística – Pátio de contêineres
       region: Japão
       latitude: 35.337296
       longitude: 139.624439
@@ -123,8 +123,8 @@ ecosense:
         harvested-scale: -0.0038
 
     - id: IOT-005
-      name: Casa solar 14,5 kWp
-      location: PV-Anlage EFH Merlischachen
+      name: Condomínio Alpenblick · Solar 14,5 kWp
+      location: Condomínio Alpenblick – Cobertura
       region: Suíça
       latitude: 47.065859
       longitude: 8.406011
@@ -137,8 +137,8 @@ ecosense:
       fields: { battery: field2, consumption: field7, temperature: none, harvested: field4 }
 
     - id: IOT-006
-      name: Banco solar Texas
-      location: Solar Array
+      name: Rancho Lone Star · Banco solar
+      location: Rancho Lone Star – Bombeamento de água
       region: EUA
       latitude: 32.4421
       longitude: -97.7942
@@ -156,8 +156,8 @@ ecosense:
         harvested-scale: 13.2
 
     - id: IOT-007
-      name: Estação de energia Nebraska
-      location: PowerStationData
+      name: Cooperativa Pradaria · Estação de energia
+      location: Cooperativa Pradaria – Silo central
       region: EUA
       latitude: 42.56
       longitude: -100.8
@@ -174,8 +174,8 @@ ecosense:
         harvested-scale: 13.2
 
     - id: IOT-008
-      name: DFRobot SPV1050 – coletor solar
-      location: Laboratório EMBEDO (indoor)
+      name: Agro Báltico · Sensor de umidade
+      location: Agro Báltico – Estufa 5
       region: Gdańsk
       latitude: 54.424526
       longitude: 18.478837
@@ -192,8 +192,8 @@ ecosense:
         harvested-scale: 0.001
 
     - id: IOT-009
-      name: Estação meteorológica Volta
-      location: Volta
+      name: Vinícola Bella Vista · Estação de clima
+      location: Vinícola Bella Vista – Vinhedo norte
       region: Itália
       latitude: 46.367166
       longitude: 11.898007
@@ -210,8 +210,8 @@ ecosense:
         harvested-scale: 0.0108
 
     - id: IOT-010
-      name: Repetidor Wi-Fi solar
-      location: SolarWiFiRepeater
+      name: Rede Rural Kiwi · Repetidor Wi-Fi
+      location: Rede Rural Kiwi – Torre 3
       region: Nova Zelândia
       latitude: -39.276366
       longitude: 173.921337

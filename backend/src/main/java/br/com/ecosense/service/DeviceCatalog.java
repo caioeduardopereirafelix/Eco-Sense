@@ -112,6 +112,10 @@ public class DeviceCatalog {
         return repository.findAllByActiveFalseOrderByDeactivatedAtDesc();
     }
 
+    public synchronized void refresh() {
+        reload();
+    }
+
     private synchronized List<DeviceConfig> reload() {
         if (repository.count() == 0 && !props.devices().isEmpty()) seed();
         cache = repository.findAllByActiveTrueOrderByPositionAscIdAsc().stream().map(DeviceCatalog::toConfig).toList();
