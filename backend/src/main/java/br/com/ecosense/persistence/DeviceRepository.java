@@ -7,7 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface DeviceRepository extends JpaRepository<DeviceEntity, String> {
 
-    List<DeviceEntity> findAllByOrderByPositionAscIdAsc();
+    List<DeviceEntity> findAllByActiveTrueOrderByPositionAscIdAsc();
+    List<DeviceEntity> findAllByActiveFalseOrderByDeactivatedAtDesc();
 
     @Query("select coalesce(max(d.position), 0) from DeviceEntity d")
     int maxPosition();

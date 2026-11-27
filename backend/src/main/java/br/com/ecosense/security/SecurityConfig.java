@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/thingspeak/**").hasRole(UserEntity.ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/devices/*/settings").hasRole(UserEntity.ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/devices").hasRole(UserEntity.ADMIN)
+                        .requestMatchers(HttpMethod.GET, "/api/devices/inactive").hasRole(UserEntity.ADMIN)
+                        .requestMatchers(HttpMethod.POST, "/api/devices/*/reactivate").hasRole(UserEntity.ADMIN)
                         .requestMatchers(HttpMethod.PUT, "/api/devices/**").hasRole(UserEntity.ADMIN)
                         .requestMatchers(HttpMethod.DELETE, "/api/devices/**").hasRole(UserEntity.ADMIN)
                         .requestMatchers(HttpMethod.PATCH, "/api/maintenance-requests/**").hasRole(UserEntity.ADMIN)

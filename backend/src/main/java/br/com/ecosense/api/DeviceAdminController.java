@@ -60,7 +60,19 @@ public class DeviceAdminController {
     @DeleteMapping("/devices/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable String id) {
-        catalog.delete(id);
+        catalog.deactivate(id);
+    }
+
+    @GetMapping("/devices/inactive")
+    public java.util.List<ApiDtos.InactiveDevice> inactive() {
+        return catalog.inactive().stream()
+                .map(e -> new ApiDtos.InactiveDevice(e.getId(), e.getName(), e.getLocation(), e.getDeactivatedAt()))
+                .toList();
+    }
+
+    @PostMapping("/devices/{id}/reactivate")
+    public Device reactivate(@PathVariable String id) {
+        return devices.toDevice(catalog.reactivate(id));
     }
 
     @GetMapping("/thingspeak/channels/{channelId}")
